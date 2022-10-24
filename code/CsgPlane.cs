@@ -1,0 +1,202 @@
+using System;
+using System.Collections.Generic;
+
+namespace Sandbox.Csg
+{
+    public readonly struct CsgPlane : IEquatable<CsgPlane>
+    {
+        public static CsgPlane operator -( CsgPlane plane )
+        {
+            return new CsgPlane(-plane.Normal, -plane.Offset);
+        }
+
+        public static CsgPlane operator +( CsgPlane plane, float offset )
+        {
+            return new CsgPlane(plane.Normal, plane.Offset + offset);
+        }
+
+        public static CsgPlane operator -( CsgPlane plane, float offset )
+        {
+            return new CsgPlane(plane.Normal, plane.Offset - offset);
+        }
+        
+        public readonly Vector3 Normal;
+        public readonly float Offset;
+
+        public CsgPlane( Vector3 normalDir, Vector3 position )
+        {
+            Normal = normalDir.Normal;
+            Offset = Vector3.Dot( Normal, position );
+        }
+        
+        public CsgPlane( Vector3 normal, float offset )
+        {
+            Normal = normal;
+            Offset = offset;
+        }
+
+        public Helper GetHelper()
+        {
+            return new Helper( this );
+        }
+
+        public CsgPlane Transform( in Matrix matrix )
+        {
+            var basis = GetHelper();
+            var position = matrix.Transform( basis.Origin );
+            var p1 = matrix.Transform( basis.Origin + basis.Tu );
+            var p2 = matrix.Transform( basis.Origin + basis.Tv );
+
+            return new CsgPlane(Vector3.Cross(p2 - position, p1 - position), position);
+        }
+
+        public int GetSign( Vector3 pos )
+        {
+            var dot = Vector3.Dot( pos, Normal ) - Offset;
+
+            return dot > CsgHelpers.DistanceEpsilon ? 1 : dot < -CsgHelpers.DistanceEpsilon ? -1 : 0;
+        }
+
+        public bool Equals( CsgPlane other )
+        {
+            return Normal.Equals(other.Normal) && Offset.Equals(other.Offset);
+        }
+
+        public bool ApproxEquals( CsgPlane other )
+        {
+            return
+                Math.Abs(1f - Vector3.Dot(Normal, other.Normal)) < CsgHelpers.UnitEpsilon &&
+                Math.Abs(Offset - other.Offset) <= CsgHelpers.DistanceEpsilon;
+        }
+        
+        public override bool Equals( object obj )
+        {
+            return obj is CsgPlane other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (Normal.GetHashCode() * 397) ^ Offset.GetHashCode();
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"{{ Normal: {Normal}, Offset: {Offset} }}";
+        }
+
+        public readonly struct Helper
+        {
+            public readonly Vector3 Origin;
+            public readonly float Offset;
+            public readonly Vector3 Normal;
+            public readonly Vector3 Tu;
+            public readonly Vector3 Tv;
+
+            public Helper( in CsgPlane plane )
+            {
+                Normal = plane.Normal;
+                Offset = plane.Offset;
+
+                Tu = Normal.GetTangent().Normal;
+                Tv = Vector3.Cross(Tu, Normal).Normal;
+
+                Origin = Normal * plane.Offset;
+            }
+
+            public CsgConvexSolid.FaceCut GetCut( CsgPlane cutPlane )
+            {
+                if (1f - Math.Abs(Vector3.Dot(Normal, cutPlane.Normal)) <= CsgHelpers.UnitEpsilon)
+                {
+                    // If this cut completely excludes the original plane, return a FaceCut that also excludes everything
+
+                    var dot = Vector3.Dot(Normal, cutPlane.Normal);
+
+                    return dot * Offset - cutPlane.Offset > CsgHelpers.DistanceEpsilon ? CsgConvexSolid.FaceCut.ExcludeNone : CsgConvexSolid.FaceCut.ExcludeAll;
+                }
+
+                var cutTangent = Vector3.Cross(Normal, cutPlane.Normal);
+                var cutNormal = Vector3.Cross(cutTangent, Normal);
+
+                cutNormal = cutNormal.Normal;
+
+                var cutNormal2 = new Vector2(
+	                Vector3.Dot(cutNormal, Tu),
+	                Vector3.Dot(cutNormal, Tv));
+
+                cutNormal2 = cutNormal2.Normal;
+
+                var t = Vector3.Dot(cutPlane.Normal * cutPlane.Offset - Origin, cutPlane.Normal)
+                        / Vector3.Dot(cutPlane.Normal, cutNormal);
+
+                return new CsgConvexSolid.FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
+            }
+
+            public Vector3 GetPoint( CsgConvexSolid.FaceCut cut )
+            {
+                return GetPoint( cut, cut.Mid );
+            }
+
+            public Vector3 GetPoint( CsgConvexSolid.FaceCut cut, float along )
+            {
+                var pos = cut.Normal * cut.Distance + new Vector2(-cut.Normal.y, cut.Normal.x) * Math.Clamp(along,
+                    float.IsNegativeInfinity(cut.Min) ? -1024f : cut.Min,
+                    float.IsPositiveInfinity(cut.Max) ? 1024f : cut.Max);
+
+                return Origin + Tu * pos.x + Tv * pos.y;
+            }
+
+            public Vector3 GetAveragePos( List<CsgConvexSolid.FaceCut> faceCuts )
+            {
+                if ( faceCuts.Count == 0 )
+                {
+                    return Normal * Offset;
+                }
+
+                var avgPos = faceCuts.GetAveragePos();
+
+                return Normal * Offset + Tu * avgPos.x + Tv * avgPos.y;
+            }
+
+            public CsgConvexSolid.FaceCut Transform( CsgConvexSolid.FaceCut cut, in Helper newHelper, in Matrix? matrix = null )
+            {
+                if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
+                {
+                    throw new NotImplementedException();
+                }
+
+                var oldTangent = Tu * -cut.Normal.y + Tv * cut.Normal.x;
+                var newTangent = oldTangent;
+
+                var minPos3 = GetPoint( cut, cut.Min );
+                var maxPos3 = GetPoint( cut, cut.Max );
+
+                if ( matrix is { } mat )
+                {
+                    newTangent = mat.TransformNormal( oldTangent ).Normal;
+
+                    minPos3 = mat.Transform( minPos3 );
+                    maxPos3 = mat.Transform( maxPos3 );
+                }
+
+                var midPos3 = (minPos3 + maxPos3) * 0.5f;
+
+                var normal = new Vector2(
+                    Vector3.Dot( newHelper.Tv, newTangent ),
+                    -Vector3.Dot( newHelper.Tu, newTangent ) );
+
+                var midPos2 = new Vector2(
+	                Vector3.Dot( newHelper.Tu, midPos3 ),
+	                Vector3.Dot( newHelper.Tv, midPos3 ) );
+
+                var min = Vector3.Dot( minPos3, newTangent );
+                var max = Vector3.Dot( maxPos3, newTangent );
+
+                return new CsgConvexSolid.FaceCut( normal, Vector3.Dot( normal, midPos2 ),
+                    Math.Min( min, max ), Math.Max( min, max ) );
+            }
+        }
+    }
+}
