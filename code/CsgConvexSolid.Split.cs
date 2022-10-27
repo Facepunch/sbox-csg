@@ -127,12 +127,7 @@ namespace Sandbox.Csg
                     
                     // Otherwise split face in two
 
-                    var posFace = new Face
-                    {
-                        Plane = face.Plane,
-                        FaceCuts = face.FaceCuts,
-                        SubFaces = new List<SubFace>()
-                    };
+                    var posFace = face with { SubFaces = new List<SubFace>() };
 
                     var negFace = discard
                         ? (Face?)null
@@ -170,12 +165,7 @@ namespace Sandbox.Csg
 
                         subFace.Neighbor?.ReplaceNeighbor( -face.Plane, this, negSolid, -cutPlane );
 
-                        negFace?.SubFaces.Add( new SubFace
-                        {
-                            FaceCuts = new List<FaceCut>( negCuts ),
-                            MaterialIndex = subFace.MaterialIndex,
-                            Neighbor = subFace.Neighbor
-                        } );
+                        negFace?.SubFaces.Add( subFace with { FaceCuts = new List<FaceCut>( negCuts ) } );
                     }
                 }
 
@@ -231,12 +221,7 @@ namespace Sandbox.Csg
             IsEmpty = true;
 
             InvalidateMesh();
-
-            if ( Collider != null )
-            {
-				Collider?.Remove();
-                Collider = null;
-            }
+            RemoveCollider();
         }
 
         private void ReplaceNeighbor( CsgPlane plane, CsgConvexSolid oldNeighbor, CsgConvexSolid newNeighbor )
@@ -274,12 +259,7 @@ namespace Sandbox.Csg
 
                     if ( subFace.FaceCuts.Split( faceCut, negCuts ) )
                     {
-                        face.SubFaces.Add( new SubFace
-                        {
-                            FaceCuts = new List<FaceCut>( negCuts ),
-                            MaterialIndex = subFace.MaterialIndex,
-                            Neighbor = subFace.Neighbor
-                        } );
+                        face.SubFaces.Add( subFace with { FaceCuts = new List<FaceCut>( negCuts ) } );
                     }
                     else if ( cutPlane.GetSign( helper.GetAveragePos( subFace.FaceCuts ) ) < 0 )
                     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
-    public partial class CsgConvexSolid
+    public partial class CsgConvexSolid : IDisposable
     {
         private readonly List<Face> _faces = new List<Face>();
 
@@ -72,9 +72,7 @@ namespace Sandbox.Csg
 
             InvalidateCollider();
         }
-
-        partial void InvalidateCollider();
-
+		
         public CsgConvexSolid Clone()
         {
             var copy = new CsgConvexSolid
@@ -192,13 +190,26 @@ namespace Sandbox.Csg
                 {
                     var c = basis.GetPoint( face.FaceCuts[i], face.FaceCuts[i].Max ) - _vertexAverage;
 
-                    volume += Vector3.Dot( a, Vector3.Cross( b, c ) );
+                    volume += Math.Abs( Vector3.Dot( a, Vector3.Cross( b, c ) ) );
 
                     b = c;
                 }
-            }
+			}
 
-            _volume = volume / 6f;
+			_volume = volume / 6f;
+        }
+
+        public void Dispose()
+		{
+			RemoveCollider();
+        }
+
+        ~CsgConvexSolid()
+        {
+	        if ( Collider.IsValid() )
+	        {
+		        Log.Warning( "Collider not disposed!" );
+	        }
         }
     }
 }

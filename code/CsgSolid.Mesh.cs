@@ -24,15 +24,18 @@ namespace Sandbox.Csg
 
 		private void CollisionUpdate()
         {
-	        if ( !_collisionInvalid && _body.IsValid() ) return;
+	        if ( !_collisionInvalid && _body.IsValid() || _polyhedra.Count == 0 ) return;
 
 	        _collisionInvalid = false;
-
+			
 	        if ( !_body.IsValid() )
 			{
-				Log.Info( $"new collision body ( IsClient: {IsClient}, _polyhedra.Count: {_polyhedra.Count} )" );
-
-				SetupPhysicsFromSphere( PhysicsMotionType.Static, 0f, 1f );
+				foreach ( var poly in _polyhedra )
+				{
+					poly.InvalidateCollider();
+				}
+				
+				SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
 
 		        if ( !PhysicsBody.IsValid() )
 		        {
@@ -42,7 +45,7 @@ namespace Sandbox.Csg
 
 		        _body = PhysicsBody;
 				_body.ClearShapes();
-	        }
+			}
 
 	        foreach ( var poly in _polyhedra )
 	        {
@@ -52,7 +55,7 @@ namespace Sandbox.Csg
 
         private void MeshUpdate()
         {
-	        if ( !_meshInvalid ) return;
+	        if ( !_meshInvalid || _polyhedra.Count == 0 ) return;
 
 	        _meshInvalid = false;
 

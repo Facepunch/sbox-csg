@@ -7,26 +7,58 @@ namespace Sandbox.Csg
     {
         private readonly List<CsgConvexSolid> _polyhedra = new List<CsgConvexSolid>();
 
-        public int DebugIndex { get; set; }
-		
         [Event.Tick.Server]
 		private void ServerTick()
 		{
-			if ( ConnectivityUpdate() )
-			{
-				CollisionUpdate();
-			}
+			CollisionUpdate();
 		}
 		
 		[Event.Tick.Client]
         private void ClientTick()
 		{
-			if ( ConnectivityUpdate() )
+			if ( !IsClientOnly && ServerDisconnectedFrom != null )
 			{
-				CollisionUpdate();
-				MeshUpdate();
+				if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
+				{
+					ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
+
+					ServerDisconnectedFrom = null;
+					ServerDisconnectionIndex = default;
+
+					_appliedModifications = 0;
+					
+					ClearPolyhedra();
+
+					_polyhedra.AddRange( clientCopy._polyhedra );
+					
+					foreach ( var poly in _polyhedra )
+					{
+						poly.Collider = null;
+						poly.InvalidateMesh();
+					}
+					
+					clientCopy.Delete();
+
+					_collisionInvalid = true;
+					_meshInvalid = true;
+					
+					OnModificationsChanged();
+				}
 			}
+
+			CollisionUpdate();
+			MeshUpdate();
 		}
+
+        private void ClearPolyhedra()
+        {
+	        foreach ( var poly in _polyhedra )
+	        {
+		        poly.Dispose();
+	        }
+
+			_polyhedra.Clear();
+        }
 
         void OnDrawGizmosSelected()
         {

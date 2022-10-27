@@ -31,7 +31,19 @@ namespace Sandbox.Csg
 
         private bool _connectivityInvalid;
 
-        private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
+        private int _nextDisconnectionIndex;
+
+        [Net]
+        public CsgSolid ServerDisconnectedFrom { get; set; }
+
+        public int ClientDisconnectionIndex { get; set; }
+
+        [Net]
+		public int ServerDisconnectionIndex { get; set; }
+
+		private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new ();
+
+		private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
             out HashSet<CsgConvexSolid> visited, out Queue<CsgConvexSolid> queue )
         {
             chunks = _sChunks ??= new List<(CsgConvexSolid, int, float)>();
@@ -81,16 +93,16 @@ namespace Sandbox.Csg
             }
         }
 
-        private bool ConnectivityUpdate()
+        private void ConnectivityUpdate()
         {
-	        if ( !_connectivityInvalid ) return true;
+	        if ( !_connectivityInvalid ) return;
 
 	        _connectivityInvalid = false;
 
 			if ( _polyhedra.Count == 0 )
             {
 				Delete();
-                return false;
+                return;
             }
 
             GetConnectivityContainers( out var chunks, out var visited, out var queue );
@@ -101,12 +113,12 @@ namespace Sandbox.Csg
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
 				Delete();
-                return false;
+                return;
             }
 
             Volume = chunks[0].Volume;
 
-            if ( chunks.Count == 1 ) return true;
+            if ( chunks.Count == 1 ) return;
 
             foreach ( var chunk in chunks.Skip( 1 ) )
             {
@@ -127,27 +139,38 @@ namespace Sandbox.Csg
                 _polyhedra.RemoveAll( x => visited.Contains( x ) );
 
                 if ( chunk.Volume < MinVolume )
-                {
-                    continue;
+				{
+					continue;
                 }
 
-                var child = new CsgSolid { Transform = Transform };
+				var child = new CsgSolid
+				{
+					IsStatic = false,
+					PhysicsEnabled = true,
+					Transform = Transform
+				};
 
                 child._polyhedra.AddRange( visited );
-                child._meshInvalid = true;
+                child._meshInvalid = child._collisionInvalid = true;
+
+                var disconnectionIndex = _nextDisconnectionIndex++;
 
                 if ( IsServer )
-				{
+                {
+	                child.ServerDisconnectionIndex = disconnectionIndex;
+	                child.ServerDisconnectedFrom = this;
 					child.ServerTick();
 				}
 
                 if ( IsClient )
                 {
+	                child.ClientDisconnectionIndex = disconnectionIndex;
+
+	                ClientDisconnections.Add( disconnectionIndex, child );
+
 					child.ClientTick();
                 }
             }
-
-            return true;
         }
     }
 }

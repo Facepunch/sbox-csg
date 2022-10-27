@@ -13,7 +13,7 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-	    public record struct Modification( int Brush, CsgOperator Operator, Matrix Transform );
+	    public record struct Modification( int Index, int Brush, CsgOperator Operator, Matrix Transform );
 
 	    private int _appliedModifications;
 
@@ -54,20 +54,23 @@ namespace Sandbox.Csg
 		    }
 	    }
 
+	    private Matrix WorldToLocal => Matrix.CreateScale( 1f / Scale )
+			* Matrix.CreateRotation( Rotation.Inverse )
+			* Matrix.CreateTranslation( -Position );
+
 		public bool Modify( CsgBrush brush, CsgOperator op, in Matrix transform )
 		{
 			Host.AssertServer( nameof(Modify) );
 
-			return Modify( new Modification( brush.ResourceId, op, transform ), brush );
+			var mod = new Modification( Modifications.Count, brush.ResourceId, op, transform * WorldToLocal );
+
+			Modifications.Add( mod );
+
+			return Modify( mod, brush );
 	    }
 
 		private bool Modify( in Modification modification, CsgBrush brush )
 		{
-			if ( IsServer )
-			{
-				Modifications.Add( modification );
-			}
-
 			_sModifySolids ??= new List<CsgConvexSolid>();
 			_sModifySolids.Clear();
 
@@ -75,10 +78,22 @@ namespace Sandbox.Csg
 
 			var changed = false;
 
+			if ( modification.Operator == CsgOperator.Add )
+			{
+				SubdivideGridAxis( new Vector3( 1f, 0f, 0f ), _sModifySolids );
+				SubdivideGridAxis( new Vector3( 0f, 1f, 0f ), _sModifySolids );
+				SubdivideGridAxis( new Vector3( 0f, 0f, 1f ), _sModifySolids );
+			}
+
 			foreach ( var solid in _sModifySolids )
 			{
 				solid.Transform( modification.Transform );
 				changed |= Modify( solid, modification.Operator );
+			}
+
+			if ( changed && modification.Operator == CsgOperator.Subtract )
+			{
+				ConnectivityUpdate();
 			}
 
 			return changed;
@@ -215,6 +230,7 @@ namespace Sandbox.Csg
 
             _meshInvalid |= renderMeshChanged;
             _collisionInvalid |= collisionChanged;
+            _connectivityInvalid |= collisionChanged;
 
             return renderMeshChanged;
         }

@@ -6,43 +6,49 @@ namespace Sandbox.Csg
 {
     partial class CsgConvexSolid
     {
-        public PhysicsShape Collider { get; set; }
-        public bool ColliderInvalid { get; private set; }
+        public PhysicsShape Collider { get; internal set; }
 
         [ThreadStatic]
         private static List<Vector3> _sPhysicsHullVertices;
 
-        partial void InvalidateCollider()
+        public void InvalidateCollider()
         {
-            ColliderInvalid = true;
+	        RemoveCollider();
         }
 
-        public void UpdateCollider( PhysicsBody body )
+        private void RemoveCollider()
         {
-	        if ( !ColliderInvalid && Collider.IsValid() ) return;
+	        if ( Collider.IsValid() && Collider.Body.IsValid() )
+	        {
+		        Collider?.Remove();
+	        }
 
-            ColliderInvalid = false;
+	        Collider = null;
+        }
 
-			Collider?.Remove();
-			Collider = null;
+		public void UpdateCollider( PhysicsBody body )
+        {
+	        if ( Collider.IsValid() ) return;
+
+	        RemoveCollider();
 
 			var vertices = _sPhysicsHullVertices ??= new List<Vector3>();
 
-			vertices.Clear();
+	        vertices.Clear();
 
-            foreach (var face in _faces)
-            {
-                if (face.FaceCuts.Count < 3) continue;
+	        foreach ( var face in _faces )
+	        {
+		        if ( face.FaceCuts.Count < 3 ) continue;
 
-                var basis = face.Plane.GetHelper();
+		        var basis = face.Plane.GetHelper();
 
-                foreach (var cut in face.FaceCuts)
-                {
-                    vertices.Add( basis.GetPoint( cut, cut.Max ) );
-				}
-            }
+		        foreach ( var cut in face.FaceCuts )
+		        {
+			        vertices.Add( basis.GetPoint( cut, cut.Max ) );
+		        }
+	        }
 
-            Collider = body.AddHullShape( Vector3.Zero, Rotation.Identity, vertices );
+	        Collider = body.AddHullShape( Vector3.Zero, Rotation.Identity, vertices );
         }
     }
 }
