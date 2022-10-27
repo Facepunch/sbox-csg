@@ -24,13 +24,15 @@ namespace Sandbox.Csg
 
 		private void CollisionUpdate()
         {
-	        if ( !_collisionInvalid ) return;
+	        if ( !_collisionInvalid && _body.IsValid() ) return;
 
 	        _collisionInvalid = false;
 
 	        if ( !_body.IsValid() )
-	        {
-		        SetupPhysicsFromSphere( PhysicsMotionType.Static, 0f, 1f );
+			{
+				Log.Info( $"new collision body ( IsClient: {IsClient}, _polyhedra.Count: {_polyhedra.Count} )" );
+
+				SetupPhysicsFromSphere( PhysicsMotionType.Static, 0f, 1f );
 
 		        if ( !PhysicsBody.IsValid() )
 		        {
@@ -117,9 +119,6 @@ namespace Sandbox.Csg
 			}
 
             mesh.SetIndexRange( 0, _sIndices.Count );
-
-			Log.Info( $"Verts: {_sVertices.Count}, Indices: {_sIndices.Count}, {mins}, {maxs}" );
-
             mesh.SetBounds( mins, maxs );
 		}
     }

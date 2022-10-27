@@ -216,8 +216,6 @@ namespace Sandbox.Csg
             _meshInvalid |= renderMeshChanged;
             _collisionInvalid |= collisionChanged;
 
-			Log.Info( $"Combine: {renderMeshChanged}" );
-
             return renderMeshChanged;
         }
 
