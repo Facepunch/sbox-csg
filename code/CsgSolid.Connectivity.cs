@@ -118,6 +118,11 @@ namespace Sandbox.Csg
 
             Volume = chunks[0].Volume;
 
+            if ( !IsStatic && PhysicsBody != null )
+            {
+	            PhysicsBody.Sleeping = false;
+            }
+
             if ( chunks.Count == 1 ) return;
 
             foreach ( var chunk in chunks.Skip( 1 ) )
