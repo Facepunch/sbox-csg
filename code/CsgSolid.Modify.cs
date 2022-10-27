@@ -54,9 +54,9 @@ namespace Sandbox.Csg
 		    }
 	    }
 
-	    private Matrix WorldToLocal => Matrix.CreateScale( 1f / Scale )
-			* Matrix.CreateRotation( Rotation.Inverse )
-			* Matrix.CreateTranslation( -Position );
+	    private Matrix WorldToLocal => Matrix.CreateTranslation( -Position )
+			* Matrix.CreateScale( 1f / Scale )
+			* Matrix.CreateRotation( Rotation.Inverse );
 
 		public bool Modify( CsgBrush brush, CsgOperator op, in Matrix transform )
 		{
