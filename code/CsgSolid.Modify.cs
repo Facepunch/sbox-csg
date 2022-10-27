@@ -13,7 +13,7 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-	    public record struct Modification( int Index, int Brush, CsgOperator Operator, Matrix Transform );
+	    public record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
 
 	    private int _appliedModifications;
 
@@ -23,29 +23,53 @@ namespace Sandbox.Csg
 		[ThreadStatic]
 	    private static List<CsgConvexSolid> _sModifySolids;
 
-	    public bool Modify( CsgBrush brush, CsgOperator op, Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-	    {
-		    var transform = Matrix.Identity;
+	    private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+		{
+			var transform = Matrix.Identity;
 
-		    if ( position != null )
-		    {
-			    transform = Matrix.CreateTranslation( position.Value );
-		    }
+			if ( position != null )
+			{
+				transform = Matrix.CreateTranslation( position.Value );
+			}
 
-		    if ( scale != null )
-		    {
-			    transform = Matrix.CreateScale( scale.Value ) * transform;
-		    }
+			if ( scale != null )
+			{
+				transform = Matrix.CreateScale( scale.Value ) * transform;
+			}
 
-		    if ( rotation != null )
+			if ( rotation != null )
 			{
 				transform = Matrix.CreateRotation( rotation.Value ) * transform;
 			}
+			
+			return transform;
+		}
 
-		    return Modify( brush, op, transform );
+	    public bool Add( CsgBrush brush, Material material,
+			Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+		{
+			return Modify( brush, material, CsgOperator.Add, CreateMatrix( position, scale, rotation ) );
+		}
+
+	    public bool Subtract( CsgBrush brush,
+		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+	    {
+		    return Modify( brush, null, CsgOperator.Subtract, CreateMatrix( position, scale, rotation ) );
+		}
+
+	    public bool Replace( CsgBrush brush, Material material,
+		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+	    {
+		    return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
+		}
+
+	    public bool Paint( CsgBrush brush, Material material,
+		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+	    {
+		    return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
 	    }
 
-	    private void OnModificationsChanged()
+		private void OnModificationsChanged()
 	    {
 		    if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
 		    {
@@ -65,11 +89,11 @@ namespace Sandbox.Csg
 			* Matrix.CreateScale( 1f / Scale )
 			* Matrix.CreateRotation( Rotation.Inverse );
 
-		public bool Modify( CsgBrush brush, CsgOperator op, in Matrix transform )
+		private bool Modify( CsgBrush brush, Material material, CsgOperator op, in Matrix transform )
 		{
 			Host.AssertServer( nameof(Modify) );
 
-			var mod = new Modification( Modifications.Count, brush.ResourceId, op, transform * WorldToLocal );
+			var mod = new Modification( brush.ResourceId, material.ResourceId, op, transform * WorldToLocal );
 
 			Modifications.Add( mod );
 

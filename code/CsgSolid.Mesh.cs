@@ -7,7 +7,7 @@ namespace Sandbox.Csg
 {
     partial class CsgSolid : IHotloadManaged
     {
-        private Mesh _mesh;
+	    private readonly Dictionary<int, Mesh> _meshes = new();
         private Model _model;
 
         private bool _meshInvalid;
@@ -112,7 +112,7 @@ namespace Sandbox.Csg
         [ThreadStatic]
 		private static List<int> _sIndices;
 
-		private static void UpdateMesh<T>( Mesh mesh, T polyhedra )
+		private static void UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
             where T : IEnumerable<CsgConvexSolid>
         {
 	        var mins = new Vector3( float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity );
