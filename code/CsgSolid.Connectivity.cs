@@ -41,6 +41,8 @@ namespace Sandbox.Csg
         [Net]
 		public int ServerDisconnectionIndex { get; set; }
 
+		private bool _copiedInitialGeometry;
+
 		private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new ();
 
 		private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,

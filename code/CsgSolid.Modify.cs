@@ -21,6 +21,7 @@ namespace Sandbox.Csg
 
 		[ThreadStatic]
 	    private static List<CsgConvexSolid> _sModifySolids;
+
 	    public bool Modify( CsgBrush brush, CsgOperator op, Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
 	    {
 		    var transform = Matrix.Identity;
@@ -45,6 +46,11 @@ namespace Sandbox.Csg
 
 	    private void OnModificationsChanged()
 	    {
+		    if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
+		    {
+				return;
+		    }
+
 		    while ( _appliedModifications < Modifications.Count )
 		    {
 			    var next = Modifications[_appliedModifications++];

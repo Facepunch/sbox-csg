@@ -16,15 +16,13 @@ namespace Sandbox.Csg
 		[Event.Tick.Client]
         private void ClientTick()
 		{
-			if ( !IsClientOnly && ServerDisconnectedFrom != null )
+			if ( !IsClientOnly && !_copiedInitialGeometry && ServerDisconnectedFrom != null )
 			{
 				if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
 				{
 					ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
 
-					ServerDisconnectedFrom = null;
-					ServerDisconnectionIndex = default;
-
+					_copiedInitialGeometry = true;
 					_appliedModifications = 0;
 					
 					ClearPolyhedra();
