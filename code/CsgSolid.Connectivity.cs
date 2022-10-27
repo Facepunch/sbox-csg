@@ -23,7 +23,7 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-        public const float MinVolume = 1f;
+        public const float MinVolume = 0.125f;
 
         [ThreadStatic] private static List<(CsgConvexSolid, int, float)> _sChunks;
         [ThreadStatic] private static HashSet<CsgConvexSolid> _sVisited;

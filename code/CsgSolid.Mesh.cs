@@ -46,11 +46,23 @@ namespace Sandbox.Csg
 		        _body = PhysicsBody;
 				_body.ClearShapes();
 			}
+			
+	        const float density = 25f;
+
+	        var mass = 0f;
 
 	        foreach ( var poly in _polyhedra )
 	        {
 		        poly.UpdateCollider( _body );
+
+		        mass += poly.Volume * density;
 	        }
+
+	        if ( _body.IsValid() && !IsStatic )
+			{
+				_body.Mass = mass;
+				_body.RebuildMass();
+			}
         }
 
         private void MeshUpdate()

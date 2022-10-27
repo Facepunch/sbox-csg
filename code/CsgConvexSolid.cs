@@ -142,7 +142,9 @@ namespace Sandbox.Csg
             var avgPos = Vector3.Zero;
             var posCount = 0;
 
-            foreach ( var face in _faces )
+			const float volumeScale = 1.638716e-5f;
+
+			foreach ( var face in _faces )
             {
                 var basis = face.Plane.GetHelper();
 
@@ -196,7 +198,7 @@ namespace Sandbox.Csg
                 }
 			}
 
-			_volume = volume / 6f;
+			_volume = volume * volumeScale / 6f;
         }
 
         public void Dispose()
