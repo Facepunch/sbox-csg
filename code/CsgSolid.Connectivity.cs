@@ -101,7 +101,17 @@ namespace Sandbox.Csg
 
 			if ( _polyhedra.Count == 0 )
             {
-				Delete();
+	            if ( IsClientOnly || IsServer )
+				{
+					Delete();
+				}
+	            else
+	            {
+		            EnableDrawing = false;
+		            PhysicsEnabled = false;
+		            EnableSolidCollisions = false;
+	            }
+
                 return;
             }
 

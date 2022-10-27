@@ -194,7 +194,7 @@ namespace Sandbox.Csg
                 }
 
                 if ( !next.IsEmpty && solid.GetSign( next.VertexAverage ) < 0 ) continue;
-
+				
                 // next will now contain only the intersection with solid.
                 // We'll copy its faces and remove it
 
@@ -202,20 +202,28 @@ namespace Sandbox.Csg
                 {
                     case CsgOperator.Replace:
                         next.MaterialIndex = solid.MaterialIndex;
-                        break;
+
+                        renderMeshChanged = true;
+						break;
 
                     case CsgOperator.Add:
                         _polyhedra.RemoveAt( polyIndex );
 
                         solid.MergeSubFacesFrom( next );
                         next.Remove( null );
-                        break;
+
+                        renderMeshChanged = true;
+                        collisionChanged = true;
+						break;
 
                     case CsgOperator.Subtract:
                         _polyhedra.RemoveAt( polyIndex );
 
                         next.Remove( null );
-                        break;
+
+                        renderMeshChanged = true;
+                        collisionChanged = true;
+						break;
                 }
             }
 
