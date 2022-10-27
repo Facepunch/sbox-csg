@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
@@ -12,7 +13,78 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-        public bool Combine( CsgConvexSolid solid, CsgOperator op )
+	    public record struct Modification( int Brush, CsgOperator Operator, Matrix Transform );
+
+	    private int _appliedModifications;
+
+	    [Net, Change] public IList<Modification> Modifications { get; set; }
+
+		[ThreadStatic]
+	    private static List<CsgConvexSolid> _sModifySolids;
+	    public bool Modify( CsgBrush brush, CsgOperator op, Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+	    {
+		    var transform = Matrix.Identity;
+
+		    if ( position != null )
+		    {
+			    transform = Matrix.CreateTranslation( position.Value );
+		    }
+
+		    if ( scale != null )
+		    {
+			    transform = Matrix.CreateScale( scale.Value ) * transform;
+		    }
+
+		    if ( rotation != null )
+			{
+				transform = Matrix.CreateRotation( rotation.Value ) * transform;
+			}
+
+		    return Modify( brush, op, transform );
+	    }
+
+	    private void OnModificationsChanged()
+	    {
+		    while ( _appliedModifications < Modifications.Count )
+		    {
+			    var next = Modifications[_appliedModifications++];
+			    var brush = ResourceLibrary.Get<CsgBrush>( next.Brush );
+
+			    Modify( next, brush );
+		    }
+	    }
+
+		public bool Modify( CsgBrush brush, CsgOperator op, in Matrix transform )
+		{
+			Host.AssertServer( nameof(Modify) );
+
+			return Modify( new Modification( brush.ResourceId, op, transform ), brush );
+	    }
+
+		private bool Modify( in Modification modification, CsgBrush brush )
+		{
+			if ( IsServer )
+			{
+				Modifications.Add( modification );
+			}
+
+			_sModifySolids ??= new List<CsgConvexSolid>();
+			_sModifySolids.Clear();
+
+			brush.CreateSolids( _sModifySolids );
+
+			var changed = false;
+
+			foreach ( var solid in _sModifySolids )
+			{
+				solid.Transform( modification.Transform );
+				changed |= Modify( solid, modification.Operator );
+			}
+
+			return changed;
+		}
+
+        private bool Modify( CsgConvexSolid solid, CsgOperator op )
         {
             var renderMeshChanged = false;
             var collisionChanged = false;

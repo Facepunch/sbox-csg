@@ -7,32 +7,32 @@ namespace Sandbox.Csg
     {
         public static CsgPlane operator -( CsgPlane plane )
         {
-            return new CsgPlane(-plane.Normal, -plane.Offset);
+            return new CsgPlane(-plane.Normal, -plane.Distance);
         }
 
         public static CsgPlane operator +( CsgPlane plane, float offset )
         {
-            return new CsgPlane(plane.Normal, plane.Offset + offset);
+            return new CsgPlane(plane.Normal, plane.Distance + offset);
         }
 
         public static CsgPlane operator -( CsgPlane plane, float offset )
         {
-            return new CsgPlane(plane.Normal, plane.Offset - offset);
+            return new CsgPlane(plane.Normal, plane.Distance - offset);
         }
         
         public readonly Vector3 Normal;
-        public readonly float Offset;
+        public readonly float Distance;
 
         public CsgPlane( Vector3 normalDir, Vector3 position )
         {
             Normal = normalDir.Normal;
-            Offset = Vector3.Dot( Normal, position );
+            Distance = Vector3.Dot( Normal, position );
         }
         
-        public CsgPlane( Vector3 normal, float offset )
+        public CsgPlane( Vector3 normal, float distance )
         {
             Normal = normal;
-            Offset = offset;
+            Distance = distance;
         }
 
         public Helper GetHelper()
@@ -52,21 +52,21 @@ namespace Sandbox.Csg
 
         public int GetSign( Vector3 pos )
         {
-            var dot = Vector3.Dot( pos, Normal ) - Offset;
+            var dot = Vector3.Dot( pos, Normal ) - Distance;
 
             return dot > CsgHelpers.DistanceEpsilon ? 1 : dot < -CsgHelpers.DistanceEpsilon ? -1 : 0;
         }
 
         public bool Equals( CsgPlane other )
         {
-            return Normal.Equals(other.Normal) && Offset.Equals(other.Offset);
+            return Normal.Equals(other.Normal) && Distance.Equals(other.Distance);
         }
 
         public bool ApproxEquals( CsgPlane other )
         {
             return
                 Math.Abs(1f - Vector3.Dot(Normal, other.Normal)) < CsgHelpers.UnitEpsilon &&
-                Math.Abs(Offset - other.Offset) <= CsgHelpers.DistanceEpsilon;
+                Math.Abs(Distance - other.Distance) <= CsgHelpers.DistanceEpsilon;
         }
         
         public override bool Equals( object obj )
@@ -78,13 +78,13 @@ namespace Sandbox.Csg
         {
             unchecked
             {
-                return (Normal.GetHashCode() * 397) ^ Offset.GetHashCode();
+                return (Normal.GetHashCode() * 397) ^ Distance.GetHashCode();
             }
         }
 
         public override string ToString()
         {
-            return $"{{ Normal: {Normal}, Offset: {Offset} }}";
+            return $"{{ Normal: {Normal}, Distance: {Distance} }}";
         }
 
         public readonly struct Helper
@@ -98,12 +98,12 @@ namespace Sandbox.Csg
             public Helper( in CsgPlane plane )
             {
                 Normal = plane.Normal;
-                Offset = plane.Offset;
+                Offset = plane.Distance;
 
                 Tu = Normal.GetTangent().Normal;
                 Tv = Vector3.Cross(Tu, Normal).Normal;
 
-                Origin = Normal * plane.Offset;
+                Origin = Normal * plane.Distance;
             }
 
             public CsgConvexSolid.FaceCut GetCut( CsgPlane cutPlane )
@@ -114,7 +114,7 @@ namespace Sandbox.Csg
 
                     var dot = Vector3.Dot(Normal, cutPlane.Normal);
 
-                    return dot * Offset - cutPlane.Offset > CsgHelpers.DistanceEpsilon ? CsgConvexSolid.FaceCut.ExcludeNone : CsgConvexSolid.FaceCut.ExcludeAll;
+                    return dot * Offset - cutPlane.Distance > CsgHelpers.DistanceEpsilon ? CsgConvexSolid.FaceCut.ExcludeNone : CsgConvexSolid.FaceCut.ExcludeAll;
                 }
 
                 var cutTangent = Vector3.Cross(Normal, cutPlane.Normal);
@@ -128,7 +128,7 @@ namespace Sandbox.Csg
 
                 cutNormal2 = cutNormal2.Normal;
 
-                var t = Vector3.Dot(cutPlane.Normal * cutPlane.Offset - Origin, cutPlane.Normal)
+                var t = Vector3.Dot(cutPlane.Normal * cutPlane.Distance - Origin, cutPlane.Normal)
                         / Vector3.Dot(cutPlane.Normal, cutNormal);
 
                 return new CsgConvexSolid.FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);

@@ -14,6 +14,7 @@ namespace Sandbox.Csg
         public int MaterialIndex { get; set; }
 
         public bool IsEmpty { get; private set; }
+        public bool IsFinite => !float.IsPositiveInfinity( Volume );
 
         public IReadOnlyList<Face> Faces => _faces;
 
@@ -84,8 +85,10 @@ namespace Sandbox.Csg
 
             foreach ( var face in _faces )
             {
-                _faces.Add( face.Clone() );
+	            copy._faces.Add( face.Clone() );
             }
+
+            copy.InvalidateMesh();
 
             return copy;
         }
@@ -147,6 +150,15 @@ namespace Sandbox.Csg
 
                 foreach ( var cut in face.FaceCuts )
                 {
+	                if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
+	                {
+		                _volume = float.PositiveInfinity;
+		                _vertexMin = float.NegativeInfinity;
+		                _vertexMax = float.PositiveInfinity;
+		                _vertexAverage = 0f;
+		                return;
+	                }
+
                     var a = basis.GetPoint( cut, cut.Min );
                     var b = basis.GetPoint( cut, cut.Max );
 
