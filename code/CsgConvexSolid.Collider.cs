@@ -28,7 +28,7 @@ namespace Sandbox.Csg
 
 		public void UpdateCollider( PhysicsBody body )
         {
-	        if ( Collider.IsValid() && Collider.Body == body ) return;
+	        if ( Collider.IsValid() ) return;
 
 	        RemoveCollider();
 
