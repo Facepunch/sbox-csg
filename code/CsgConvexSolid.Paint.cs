@@ -13,10 +13,12 @@ namespace Sandbox.Csg
             return subFace.Neighbor == null && (subFace.Material ?? Material) != (material ?? Material);
         }
 
-        public void Paint( CsgConvexSolid brush, CsgMaterial material )
+        public bool Paint( CsgConvexSolid brush, CsgMaterial material )
         {
             var paintCuts = CsgHelpers.RentFaceCutList();
             var negCuts = CsgHelpers.RentFaceCutList();
+
+            var changed = false;
 
             try
             {
@@ -38,7 +40,9 @@ namespace Sandbox.Csg
                         continue;
                     }
 
-                    var helper = face.Plane.GetHelper();
+                    changed = true;
+
+					var helper = face.Plane.GetHelper();
 
                     paintCuts.Clear();
                     paintCuts.AddRange( face.FaceCuts );
@@ -88,6 +92,8 @@ namespace Sandbox.Csg
                         face.SubFaces[i] = subFace;
                     }
                 }
+
+                return changed;
             }
             finally
             {

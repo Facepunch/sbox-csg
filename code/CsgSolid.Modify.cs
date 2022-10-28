@@ -8,7 +8,8 @@ namespace Sandbox.Csg
         Add,
         Subtract,
         Replace,
-        Paint
+        Paint,
+		Disconnect
     }
 
     partial class CsgSolid
@@ -75,6 +76,11 @@ namespace Sandbox.Csg
             return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
         }
 
+        public bool Disconnect()
+		{
+			return Modify( null, null, CsgOperator.Disconnect, default );
+		}
+
         private void OnModificationsChanged()
         {
             if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
@@ -85,8 +91,8 @@ namespace Sandbox.Csg
             while ( _appliedModifications < Modifications.Count )
             {
                 var next = Modifications[_appliedModifications++];
-                var brush = ResourceLibrary.Get<CsgBrush>( next.Brush );
-                var material = ResourceLibrary.Get<CsgMaterial>( next.Material );
+                var brush = next.Brush == 0 ? null : ResourceLibrary.Get<CsgBrush>( next.Brush );
+                var material = next.Material == 0 ? null : ResourceLibrary.Get<CsgMaterial>( next.Material );
 
                 Modify( next, brush, material );
             }
@@ -100,15 +106,24 @@ namespace Sandbox.Csg
         {
             Host.AssertServer( nameof(Modify) );
 
-            var mod = new Modification( brush.ResourceId, material?.ResourceId ?? 0, op, transform * WorldToLocal );
+            var mod = new Modification( brush?.ResourceId ?? 0, material?.ResourceId ?? 0, op, transform * WorldToLocal );
+			
+            if ( Modify( mod, brush, material ) )
+			{
+				Modifications.Add( mod );
+				return true;
+			}
 
-            Modifications.Add( mod );
-
-            return Modify( mod, brush, material );
+            return false;
         }
 
         private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
         {
+	        if ( modification.Operator == CsgOperator.Disconnect )
+			{
+				return ConnectivityUpdate();
+			}
+
             _sModifySolids ??= new List<CsgConvexSolid>();
             _sModifySolids.Clear();
 
@@ -128,11 +143,6 @@ namespace Sandbox.Csg
                 solid.Material = material;
                 solid.Transform( modification.Transform );
                 changed |= Modify( solid, modification.Operator );
-            }
-
-            if ( changed && modification.Operator == CsgOperator.Subtract )
-            {
-                ConnectivityUpdate();
             }
 
             return changed;
@@ -176,7 +186,7 @@ namespace Sandbox.Csg
                         break;
 
                     case CsgOperator.Paint:
-                        next.Paint( solid, solid.Material );
+	                    renderMeshChanged |= next.Paint( solid, solid.Material );
                         skip = true;
                         break;
 

@@ -95,9 +95,9 @@ namespace Sandbox.Csg
             }
         }
 
-        private void ConnectivityUpdate()
+        private bool ConnectivityUpdate()
         {
-            if ( !_connectivityInvalid ) return;
+            if ( !_connectivityInvalid ) return false;
 
             _connectivityInvalid = false;
             
@@ -114,7 +114,7 @@ namespace Sandbox.Csg
                     EnableSolidCollisions = false;
                 }
 
-                return;
+                return true;
             }
 
             GetConnectivityContainers( out var chunks, out var visited, out var queue );
@@ -125,7 +125,7 @@ namespace Sandbox.Csg
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
                 Delete();
-                return;
+                return true;
             }
 
             if ( !IsStatic && PhysicsBody != null )
@@ -133,7 +133,7 @@ namespace Sandbox.Csg
                 PhysicsBody.Sleeping = false;
             }
 
-            if ( chunks.Count == 1 ) return;
+            if ( chunks.Count == 1 ) return false;
 
             foreach ( var chunk in chunks.Skip( 1 ) )
             {
@@ -183,6 +183,8 @@ namespace Sandbox.Csg
                     ClientDisconnections.Add( disconnectionIndex, child );
                 }
             }
+
+            return true;
         }
     }
 }
