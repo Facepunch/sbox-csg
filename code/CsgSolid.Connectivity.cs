@@ -95,6 +95,37 @@ namespace Sandbox.Csg
             }
         }
 
+        private void CheckInitialGeometry()
+        {
+	        if ( _copiedInitialGeometry || ServerDisconnectedFrom == null ) return;
+
+	        if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
+	        {
+		        ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
+
+		        _copiedInitialGeometry = true;
+		        _appliedModifications = 0;
+
+		        ClearPolyhedra();
+
+		        _polyhedra.AddRange( clientCopy._polyhedra );
+		        clientCopy._polyhedra.Clear();
+
+		        foreach ( var poly in _polyhedra )
+		        {
+			        poly.Collider = null;
+			        poly.InvalidateMesh();
+		        }
+
+		        clientCopy.Delete();
+
+		        _collisionInvalid = true;
+		        _meshInvalid = true;
+
+		        OnModificationsChanged();
+	        }
+		}
+
         private bool ConnectivityUpdate()
         {
             if ( !_connectivityInvalid ) return false;

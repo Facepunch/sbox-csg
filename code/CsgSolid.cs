@@ -8,7 +8,7 @@ namespace Sandbox.Csg
         private readonly List<CsgConvexSolid> _polyhedra = new List<CsgConvexSolid>();
 
         [Event.Tick.Server]
-        private void ServerTick()
+		private void ServerTick()
         {
             CollisionUpdate();
         }
@@ -16,37 +16,13 @@ namespace Sandbox.Csg
         [Event.Tick.Client]
         private void ClientTick()
         {
-            if ( !IsClientOnly && !_copiedInitialGeometry && ServerDisconnectedFrom != null )
-            {
-                if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
-                {
-                    ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
+			if ( !IsClientOnly )
+			{
+				CheckInitialGeometry();
+			}
 
-                    _copiedInitialGeometry = true;
-                    _appliedModifications = 0;
-
-                    ClearPolyhedra();
-
-                    _polyhedra.AddRange( clientCopy._polyhedra );
-                    clientCopy._polyhedra.Clear();
-
-                    foreach ( var poly in _polyhedra )
-                    {
-                        poly.Collider = null;
-                        poly.InvalidateMesh();
-                    }
-
-                    clientCopy.Delete();
-
-                    _collisionInvalid = true;
-                    _meshInvalid = true;
-
-                    OnModificationsChanged();
-                }
-            }
-
-            CollisionUpdate();
-            MeshUpdate();
+			CollisionUpdate();
+			MeshUpdate();
         }
 
         private void ClearPolyhedra()
