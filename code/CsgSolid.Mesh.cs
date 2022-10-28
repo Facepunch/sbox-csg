@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 
 namespace Sandbox.Csg
 {
-    partial class CsgSolid : IHotloadManaged
+	public record struct SubFaceIndices( int PolyIndex, int FaceIndex, int SubFaceIndex, int MaterialIndex );
+
+	partial class CsgSolid : IHotloadManaged
     {
 	    private readonly Dictionary<int, Mesh> _meshes = new();
         private Model _model;
@@ -73,28 +75,23 @@ namespace Sandbox.Csg
 		
 		private void MeshUpdate()
 		{
-			if ( _mesh is { IsValid: true } && _model != null && _model == Model && !_meshInvalid ||
-			     _polyhedra.Count == 0 )
+			if ( !_meshInvalid && _model is { IsProcedural: true } || _polyhedra.Count == 0 )
 			{
 				return;
 			}
 
 	        _meshInvalid = false;
 
-	        if ( _mesh is not { IsValid: true } )
-	        {
-		        var material = Material.Load( "materials/csgdemo/default.vmat" );
+	        var newMeshes = UpdateMeshes( _meshes, _polyhedra );
 
-		        _mesh = new Mesh( material );
-			}
-
-			UpdateMesh( _mesh, _polyhedra );
-
-			if ( _model is not { MeshCount: > 0 } )
+			if ( _model is not { IsProcedural: true } || newMeshes )
 			{
-			    var modelBuilder = new ModelBuilder();
+				var modelBuilder = new ModelBuilder();
 
-			    modelBuilder.AddMesh( _mesh );
+			    foreach ( var pair in _meshes )
+			    {
+				    modelBuilder.AddMesh( pair.Value );
+			    }
 
 			    _model = modelBuilder.Create();
 			}
@@ -107,47 +104,101 @@ namespace Sandbox.Csg
 		}
 
 		[ThreadStatic]
+		private static List<SubFaceIndices> _sSubFaces;
+
+		[ThreadStatic]
         private static List<CsgVertex> _sVertices;
 
         [ThreadStatic]
 		private static List<int> _sIndices;
 
-		private static void UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
-            where T : IEnumerable<CsgConvexSolid>
+		private static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
+            where T : IList<CsgConvexSolid>
         {
-	        var mins = new Vector3( float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity );
-            var maxs = new Vector3( float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity );
-
-            _sVertices ??= new List<CsgVertex>();
+	        _sSubFaces ??= new List<SubFaceIndices>();
+			_sVertices ??= new List<CsgVertex>();
 			_sIndices ??= new List<int>();
 
-			_sVertices.Clear();
-			_sIndices.Clear();
+			_sSubFaces.Clear();
 
-            foreach (var poly in polyhedra)
-			{
-				poly.WriteMesh( _sVertices, _sIndices );
-
-				mins = Vector3.Min( mins, poly.VertexMin );
-				maxs = Vector3.Max( maxs, poly.VertexMax );
-            }
-
-            if ( !mesh.HasVertexBuffer )
+            for ( var i = 0; i < polyhedra.Count; ++i )
             {
-	            mesh.CreateVertexBuffer( _sVertices.Count, CsgVertex.Layout, _sVertices );
-	            mesh.CreateIndexBuffer( _sIndices.Count, _sIndices );
+	            polyhedra[i].FindSubFaces( i, _sSubFaces );
             }
-            else
-			{
-				mesh.SetVertexBufferSize( _sVertices.Count );
-				mesh.SetIndexBufferSize( _sIndices.Count );
 
-				mesh.SetVertexBufferData( _sVertices );
-				mesh.SetIndexBufferData( _sIndices );
+            _sSubFaces.Sort( ( a, b ) => a.MaterialIndex - b.MaterialIndex );
+
+            foreach ( var pair in meshes )
+            {
+	            pair.Value.SetIndexRange( 0, 0 );
+            }
+
+            var lastMaterialIndex = -1;
+            CsgMaterial material = null;
+            Mesh mesh = null;
+
+            Vector3 mins = default;
+            Vector3 maxs = default;
+
+			var offset = 0;
+			var newMeshes = false;
+
+			while ( offset < _sSubFaces.Count )
+            {
+	            var nextIndices = _sSubFaces[offset];
+	            var poly = polyhedra[nextIndices.PolyIndex];
+
+	            if ( nextIndices.MaterialIndex != lastMaterialIndex )
+	            {
+		            lastMaterialIndex = nextIndices.MaterialIndex;
+					material = ResourceLibrary.Get<CsgMaterial>( nextIndices.MaterialIndex );
+					
+					UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
+
+					_sVertices.Clear();
+					_sIndices.Clear();
+
+					mins = new Vector3( float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity );
+					maxs = new Vector3( float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity );
+
+					if ( !meshes.TryGetValue( nextIndices.MaterialIndex, out mesh ) || !mesh.IsValid )
+					{
+						newMeshes = true;
+						meshes[nextIndices.MaterialIndex] = mesh = new Mesh( material.RuntimeMaterial );
+					}
+				}
+
+	            poly.WriteMeshSubFaces( _sSubFaces, ref offset, material, _sVertices, _sIndices );
+
+	            mins = Vector3.Min( mins, poly.VertexMin );
+	            maxs = Vector3.Max( maxs, poly.VertexMax );
+			}
+			
+	        UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
+
+	        return newMeshes;
+        }
+
+		private static void UpdateMesh( Mesh mesh, Vector3 mins, Vector3 maxs, List<CsgVertex> vertices, List<int> indices )
+		{
+			if ( mesh == null ) return;
+
+			if ( !mesh.HasVertexBuffer )
+			{
+				mesh.CreateVertexBuffer( vertices.Count, CsgVertex.Layout, vertices );
+				mesh.CreateIndexBuffer( indices.Count, indices );
+			}
+			else
+			{
+				mesh.SetVertexBufferSize( vertices.Count );
+				mesh.SetIndexBufferSize( indices.Count );
+
+				mesh.SetVertexBufferData( vertices );
+				mesh.SetIndexBufferData( indices );
 			}
 
-            mesh.SetIndexRange( 0, _sIndices.Count );
-            mesh.SetBounds( mins, maxs );
+			mesh.SetIndexRange( 0, indices.Count );
+			mesh.SetBounds( mins, maxs );
 		}
     }
 
@@ -165,43 +216,79 @@ namespace Sandbox.Csg
 
 	partial class CsgConvexSolid
 	{
-		public void WriteMesh( List<CsgVertex> vertices, List<int> indices )
+		public void FindSubFaces( int polyIndex, List<SubFaceIndices> subFaces )
 		{
-			const float uvScale = 1f / 128f;
+			var materialId = Material.ResourceId;
 
-			foreach ( var face in _faces )
+			for ( var faceIndex = 0; faceIndex < _faces.Count; ++faceIndex )
 			{
-				var basis = face.Plane.GetHelper();
-				var normal = -face.Plane.Normal;
-				var tangent = basis.Tu;
+				var face = _faces[faceIndex];
 
-				foreach ( var subFace in face.SubFaces )
+				for ( var subFaceIndex = 0; subFaceIndex < face.SubFaces.Count; ++subFaceIndex )
 				{
+					var subFace = face.SubFaces[subFaceIndex];
+
 					if ( subFace.Neighbor != null ) continue;
 					if ( subFace.FaceCuts.Count < 3 ) continue;
 
-					var firstIndex = vertices.Count;
-					var materialIndex = subFace.MaterialIndex ?? MaterialIndex;
+					subFaces.Add( new (polyIndex, faceIndex, subFaceIndex, subFace.Material?.ResourceId ?? materialId ) );
+				}
+			}
+		}
 
-					subFace.FaceCuts.Sort( FaceCut.Comparer );
+		public void WriteMeshSubFaces( List<SubFaceIndices> subFaces, ref int offset,
+			CsgMaterial material, List<CsgVertex> vertices, List<int> indices )
+		{
+			const float uvScale = 1f / 128f;
 
-					foreach ( var cut in subFace.FaceCuts )
-					{
-						var vertex = basis.GetPoint( cut, cut.Max );
+			var lastFaceIndex = -1;
 
-						vertices.Add( new CsgVertex(
-							vertex, normal, tangent, new Vector3(
-								Vector3.Dot( basis.Tu, vertex ) * uvScale,
-								Vector3.Dot( basis.Tv, vertex ) * uvScale,
-								materialIndex ) ) );
-					}
+			Face face = default;
+			CsgPlane.Helper basis = default;
+			Vector3 normal = default;
+			Vector3 tangent = default;
 
-					for ( var i = 2; i < subFace.FaceCuts.Count; ++i )
-					{
-						indices.Add( firstIndex );
-						indices.Add( firstIndex + i - 1 );
-						indices.Add( firstIndex + i );
-					}
+			var firstIndices = subFaces[offset];
+
+			for ( ; offset < subFaces.Count; ++offset )
+			{
+				var subFaceIndices = subFaces[offset];
+
+				if ( subFaceIndices.PolyIndex != firstIndices.PolyIndex ) break;
+				if ( subFaceIndices.MaterialIndex != firstIndices.MaterialIndex ) break;
+
+				if ( lastFaceIndex != subFaceIndices.FaceIndex )
+				{
+					lastFaceIndex = subFaceIndices.FaceIndex;
+
+					face = _faces[subFaceIndices.FaceIndex];
+					basis = face.Plane.GetHelper();
+					normal = -face.Plane.Normal;
+					tangent = basis.Tu;
+				}
+
+				var subFace = face.SubFaces[subFaceIndices.SubFaceIndex];
+
+				var firstIndex = vertices.Count;
+
+				subFace.FaceCuts.Sort( FaceCut.Comparer );
+
+				foreach ( var cut in subFace.FaceCuts )
+				{
+					var vertex = basis.GetPoint( cut, cut.Max );
+
+					vertices.Add( new CsgVertex(
+						vertex, normal, tangent, new Vector3(
+							Vector3.Dot( basis.Tu, vertex ) * uvScale,
+							Vector3.Dot( basis.Tv, vertex ) * uvScale,
+							0f ) ) );
+				}
+
+				for ( var i = 2; i < subFace.FaceCuts.Count; ++i )
+				{
+					indices.Add( firstIndex );
+					indices.Add( firstIndex + i - 1 );
+					indices.Add( firstIndex + i );
 				}
 			}
 		}

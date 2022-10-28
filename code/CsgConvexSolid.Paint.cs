@@ -8,12 +8,12 @@ namespace Sandbox.Csg
 {
     partial class CsgConvexSolid
     {
-        private bool ShouldPaintSubFace( SubFace subFace, int? paintMaterialIndex )
+        private bool ShouldPaintSubFace( SubFace subFace, CsgMaterial material )
         {
-            return subFace.Neighbor == null && (subFace.MaterialIndex ?? MaterialIndex) != (paintMaterialIndex ?? MaterialIndex);
+            return subFace.Neighbor == null && (subFace.Material ?? Material) != (material ?? Material);
         }
 
-        public void Paint( CsgConvexSolid brush, int? materialIndex )
+        public void Paint( CsgConvexSolid brush, CsgMaterial material )
         {
             var paintCuts = CsgHelpers.RentFaceCutList();
             var negCuts = CsgHelpers.RentFaceCutList();
@@ -26,7 +26,7 @@ namespace Sandbox.Csg
 
                     foreach ( var subFace in face.SubFaces )
                     {
-                        if ( ShouldPaintSubFace( subFace, materialIndex ) )
+                        if ( ShouldPaintSubFace( subFace, material ) )
                         {
                             anyToPaint = true;
                             break;
@@ -59,7 +59,7 @@ namespace Sandbox.Csg
                     {
                         var subFace = face.SubFaces[i];
 
-                        if ( !ShouldPaintSubFace( subFace, materialIndex ) ) continue;
+                        if ( !ShouldPaintSubFace( subFace, material ) ) continue;
 
                         foreach ( var brushFace in brush.Faces )
                         {
@@ -75,7 +75,7 @@ namespace Sandbox.Csg
                             face.SubFaces.Add( new SubFace
                             {
                                 FaceCuts = new List<FaceCut>( negCuts ),
-                                MaterialIndex = subFace.MaterialIndex
+                                Material = subFace.Material
                             } );
                         }
 
@@ -84,7 +84,7 @@ namespace Sandbox.Csg
                             continue;
                         }
 
-                        subFace.MaterialIndex = materialIndex;
+                        subFace.Material = material;
                         face.SubFaces[i] = subFace;
                     }
                 }

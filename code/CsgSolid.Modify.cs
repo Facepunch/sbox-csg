@@ -45,9 +45,11 @@ namespace Sandbox.Csg
 			return transform;
 		}
 
-	    public bool Add( CsgBrush brush, Material material,
+	    public bool Add( CsgBrush brush, CsgMaterial material,
 			Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-		{
+	    {
+		    Assert.NotNull( material );
+
 			return Modify( brush, material, CsgOperator.Add, CreateMatrix( position, scale, rotation ) );
 		}
 
@@ -57,16 +59,20 @@ namespace Sandbox.Csg
 		    return Modify( brush, null, CsgOperator.Subtract, CreateMatrix( position, scale, rotation ) );
 		}
 
-	    public bool Replace( CsgBrush brush, Material material,
+	    public bool Replace( CsgBrush brush, CsgMaterial material,
 		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-	    {
-		    return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
+		{
+			Assert.NotNull( material );
+
+			return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
 		}
 
-	    public bool Paint( CsgBrush brush, Material material,
+	    public bool Paint( CsgBrush brush, CsgMaterial material,
 		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-	    {
-		    return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
+		{
+			Assert.NotNull( material );
+
+			return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
 	    }
 
 		private void OnModificationsChanged()
@@ -80,8 +86,9 @@ namespace Sandbox.Csg
 		    {
 			    var next = Modifications[_appliedModifications++];
 			    var brush = ResourceLibrary.Get<CsgBrush>( next.Brush );
+			    var material = ResourceLibrary.Get<CsgMaterial>( next.Material );
 
-			    Modify( next, brush );
+			    Modify( next, brush, material );
 		    }
 	    }
 
@@ -89,18 +96,18 @@ namespace Sandbox.Csg
 			* Matrix.CreateScale( 1f / Scale )
 			* Matrix.CreateRotation( Rotation.Inverse );
 
-		private bool Modify( CsgBrush brush, Material material, CsgOperator op, in Matrix transform )
+		private bool Modify( CsgBrush brush, CsgMaterial material, CsgOperator op, in Matrix transform )
 		{
 			Host.AssertServer( nameof(Modify) );
 
-			var mod = new Modification( brush.ResourceId, material.ResourceId, op, transform * WorldToLocal );
+			var mod = new Modification( brush.ResourceId, material?.ResourceId ?? 0, op, transform * WorldToLocal );
 
 			Modifications.Add( mod );
 
-			return Modify( mod, brush );
+			return Modify( mod, brush, material );
 	    }
 
-		private bool Modify( in Modification modification, CsgBrush brush )
+		private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
 		{
 			_sModifySolids ??= new List<CsgConvexSolid>();
 			_sModifySolids.Clear();
@@ -118,6 +125,7 @@ namespace Sandbox.Csg
 
 			foreach ( var solid in _sModifySolids )
 			{
+				solid.Material = material;
 				solid.Transform( modification.Transform );
 				changed |= Modify( solid, modification.Operator );
 			}
@@ -164,11 +172,11 @@ namespace Sandbox.Csg
                 {
                     case CsgOperator.Replace:
                         next.Paint( solid, null );
-                        skip = next.MaterialIndex == solid.MaterialIndex;
+                        skip = next.Material == solid.Material;
                         break;
 
                     case CsgOperator.Paint:
-                        next.Paint( solid, solid.MaterialIndex );
+                        next.Paint( solid, solid.Material );
                         skip = true;
                         break;
 
@@ -232,7 +240,7 @@ namespace Sandbox.Csg
                 switch ( op )
                 {
                     case CsgOperator.Replace:
-                        next.MaterialIndex = solid.MaterialIndex;
+                        next.Material = solid.Material;
 
                         renderMeshChanged = true;
 						break;

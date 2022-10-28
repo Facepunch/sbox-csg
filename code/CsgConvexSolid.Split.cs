@@ -72,7 +72,7 @@ namespace Sandbox.Csg
                     ? null
                     : new CsgConvexSolid
                     {
-                        MaterialIndex = MaterialIndex
+                        Material = Material
                     };
 
                 var posSubFace = new SubFace

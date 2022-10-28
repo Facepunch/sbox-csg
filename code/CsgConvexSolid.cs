@@ -11,7 +11,7 @@ namespace Sandbox.Csg
 
         public int Index { get; }
 
-        public int MaterialIndex { get; set; }
+        public CsgMaterial Material { get; set; }
 
         public bool IsEmpty { get; private set; }
         public bool IsFinite => !float.IsPositiveInfinity( Volume );
@@ -77,7 +77,7 @@ namespace Sandbox.Csg
         {
             var copy = new CsgConvexSolid
             {
-                MaterialIndex = MaterialIndex,
+				Material = Material,
                 IsEmpty = IsEmpty
             };
 

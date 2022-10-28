@@ -77,12 +77,7 @@ namespace Sandbox.Csg
                                 continue;
                             }
                             
-                            SubFaces.Add( new SubFace
-                            {
-                                FaceCuts = new List<FaceCut>( negCuts ),
-                                MaterialIndex = thisSubFace.MaterialIndex,
-                                Neighbor = thisSubFace.Neighbor
-                            } );
+                            SubFaces.Add( thisSubFace with { FaceCuts = new List<FaceCut>( negCuts ) } );
                         }
                         
                         if ( faceCuts.Contains( thisSubFace.FaceCuts.GetAveragePos() ) )
@@ -117,16 +112,11 @@ namespace Sandbox.Csg
         {
             public List<FaceCut> FaceCuts;
             public CsgConvexSolid Neighbor;
-            public int? MaterialIndex;
+            public CsgMaterial Material;
 
             public SubFace Clone()
             {
-                return new SubFace
-                {
-                    FaceCuts = new List<FaceCut>( FaceCuts ),
-                    Neighbor = Neighbor,
-                    MaterialIndex = MaterialIndex
-                };
+                return this with { FaceCuts = new List<FaceCut>( FaceCuts ) };
             }
         }
 
