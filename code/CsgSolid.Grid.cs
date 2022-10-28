@@ -5,14 +5,14 @@ namespace Sandbox.Csg
 {
     partial class CsgSolid
     {
-		[Net]
+        [Net]
         public Vector3 GridSize { get; set; }
 
         private void SubdivideGridAxis( Vector3 axis, List<CsgConvexSolid> polys )
         {
-	        return;
+            return;
 
-			// TODO
+            // TODO
 
             var gridSize = Vector3.Dot( axis, GridSize );
 

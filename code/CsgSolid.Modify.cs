@@ -3,140 +3,140 @@ using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
-	public enum CsgOperator
-	{
-		Add,
-		Subtract,
-		Replace,
-		Paint
-	}
+    public enum CsgOperator
+    {
+        Add,
+        Subtract,
+        Replace,
+        Paint
+    }
 
     partial class CsgSolid
     {
-	    public record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
+        public record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
 
-	    private int _appliedModifications;
+        private int _appliedModifications;
 
-	    [Net, Change, HideInEditor]
-	    public IList<Modification> Modifications { get; set; }
+        [Net, Change, HideInEditor]
+        public IList<Modification> Modifications { get; set; }
 
-		[ThreadStatic]
-	    private static List<CsgConvexSolid> _sModifySolids;
+        [ThreadStatic]
+        private static List<CsgConvexSolid> _sModifySolids;
 
-	    private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-		{
-			var transform = Matrix.Identity;
+        private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        {
+            var transform = Matrix.Identity;
 
-			if ( position != null )
-			{
-				transform = Matrix.CreateTranslation( position.Value );
-			}
+            if ( position != null )
+            {
+                transform = Matrix.CreateTranslation( position.Value );
+            }
 
-			if ( scale != null )
-			{
-				transform = Matrix.CreateScale( scale.Value ) * transform;
-			}
+            if ( scale != null )
+            {
+                transform = Matrix.CreateScale( scale.Value ) * transform;
+            }
 
-			if ( rotation != null )
-			{
-				transform = Matrix.CreateRotation( rotation.Value ) * transform;
-			}
-			
-			return transform;
-		}
+            if ( rotation != null )
+            {
+                transform = Matrix.CreateRotation( rotation.Value ) * transform;
+            }
+            
+            return transform;
+        }
 
-	    public bool Add( CsgBrush brush, CsgMaterial material,
-			Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-	    {
-		    Assert.NotNull( material );
+        public bool Add( CsgBrush brush, CsgMaterial material,
+            Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        {
+            Assert.NotNull( material );
 
-			return Modify( brush, material, CsgOperator.Add, CreateMatrix( position, scale, rotation ) );
-		}
+            return Modify( brush, material, CsgOperator.Add, CreateMatrix( position, scale, rotation ) );
+        }
 
-	    public bool Subtract( CsgBrush brush,
-		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-	    {
-		    return Modify( brush, null, CsgOperator.Subtract, CreateMatrix( position, scale, rotation ) );
-		}
+        public bool Subtract( CsgBrush brush,
+            Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        {
+            return Modify( brush, null, CsgOperator.Subtract, CreateMatrix( position, scale, rotation ) );
+        }
 
-	    public bool Replace( CsgBrush brush, CsgMaterial material,
-		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-		{
-			Assert.NotNull( material );
+        public bool Replace( CsgBrush brush, CsgMaterial material,
+            Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        {
+            Assert.NotNull( material );
 
-			return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
-		}
+            return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
+        }
 
-	    public bool Paint( CsgBrush brush, CsgMaterial material,
-		    Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
-		{
-			Assert.NotNull( material );
+        public bool Paint( CsgBrush brush, CsgMaterial material,
+            Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        {
+            Assert.NotNull( material );
 
-			return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
-	    }
+            return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
+        }
 
-		private void OnModificationsChanged()
-	    {
-		    if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
-		    {
-				return;
-		    }
+        private void OnModificationsChanged()
+        {
+            if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
+            {
+                return;
+            }
 
-		    while ( _appliedModifications < Modifications.Count )
-		    {
-			    var next = Modifications[_appliedModifications++];
-			    var brush = ResourceLibrary.Get<CsgBrush>( next.Brush );
-			    var material = ResourceLibrary.Get<CsgMaterial>( next.Material );
+            while ( _appliedModifications < Modifications.Count )
+            {
+                var next = Modifications[_appliedModifications++];
+                var brush = ResourceLibrary.Get<CsgBrush>( next.Brush );
+                var material = ResourceLibrary.Get<CsgMaterial>( next.Material );
 
-			    Modify( next, brush, material );
-		    }
-	    }
+                Modify( next, brush, material );
+            }
+        }
 
-	    private Matrix WorldToLocal => Matrix.CreateTranslation( -Position )
-			* Matrix.CreateScale( 1f / Scale )
-			* Matrix.CreateRotation( Rotation.Inverse );
+        private Matrix WorldToLocal => Matrix.CreateTranslation( -Position )
+            * Matrix.CreateScale( 1f / Scale )
+            * Matrix.CreateRotation( Rotation.Inverse );
 
-		private bool Modify( CsgBrush brush, CsgMaterial material, CsgOperator op, in Matrix transform )
-		{
-			Host.AssertServer( nameof(Modify) );
+        private bool Modify( CsgBrush brush, CsgMaterial material, CsgOperator op, in Matrix transform )
+        {
+            Host.AssertServer( nameof(Modify) );
 
-			var mod = new Modification( brush.ResourceId, material?.ResourceId ?? 0, op, transform * WorldToLocal );
+            var mod = new Modification( brush.ResourceId, material?.ResourceId ?? 0, op, transform * WorldToLocal );
 
-			Modifications.Add( mod );
+            Modifications.Add( mod );
 
-			return Modify( mod, brush, material );
-	    }
+            return Modify( mod, brush, material );
+        }
 
-		private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
-		{
-			_sModifySolids ??= new List<CsgConvexSolid>();
-			_sModifySolids.Clear();
+        private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
+        {
+            _sModifySolids ??= new List<CsgConvexSolid>();
+            _sModifySolids.Clear();
 
-			brush.CreateSolids( _sModifySolids );
+            brush.CreateSolids( _sModifySolids );
 
-			var changed = false;
+            var changed = false;
 
-			if ( modification.Operator == CsgOperator.Add )
-			{
-				SubdivideGridAxis( new Vector3( 1f, 0f, 0f ), _sModifySolids );
-				SubdivideGridAxis( new Vector3( 0f, 1f, 0f ), _sModifySolids );
-				SubdivideGridAxis( new Vector3( 0f, 0f, 1f ), _sModifySolids );
-			}
+            if ( modification.Operator == CsgOperator.Add )
+            {
+                SubdivideGridAxis( new Vector3( 1f, 0f, 0f ), _sModifySolids );
+                SubdivideGridAxis( new Vector3( 0f, 1f, 0f ), _sModifySolids );
+                SubdivideGridAxis( new Vector3( 0f, 0f, 1f ), _sModifySolids );
+            }
 
-			foreach ( var solid in _sModifySolids )
-			{
-				solid.Material = material;
-				solid.Transform( modification.Transform );
-				changed |= Modify( solid, modification.Operator );
-			}
+            foreach ( var solid in _sModifySolids )
+            {
+                solid.Material = material;
+                solid.Transform( modification.Transform );
+                changed |= Modify( solid, modification.Operator );
+            }
 
-			if ( changed && modification.Operator == CsgOperator.Subtract )
-			{
-				ConnectivityUpdate();
-			}
+            if ( changed && modification.Operator == CsgOperator.Subtract )
+            {
+                ConnectivityUpdate();
+            }
 
-			return changed;
-		}
+            return changed;
+        }
 
         private bool Modify( CsgConvexSolid solid, CsgOperator op )
         {
@@ -194,7 +194,7 @@ namespace Sandbox.Csg
 
                             if ( ConnectFaces( solidFace, solid, nextFace, next ) )
                             {
-	                            renderMeshChanged = true;
+                                renderMeshChanged = true;
                             }
 
                             break;
@@ -233,7 +233,7 @@ namespace Sandbox.Csg
                 }
 
                 if ( !next.IsEmpty && solid.GetSign( next.VertexAverage ) < 0 ) continue;
-				
+                
                 // next will now contain only the intersection with solid.
                 // We'll copy its faces and remove it
 
@@ -243,7 +243,7 @@ namespace Sandbox.Csg
                         next.Material = solid.Material;
 
                         renderMeshChanged = true;
-						break;
+                        break;
 
                     case CsgOperator.Add:
                         _polyhedra.RemoveAt( polyIndex );
@@ -253,7 +253,7 @@ namespace Sandbox.Csg
 
                         renderMeshChanged = true;
                         collisionChanged = true;
-						break;
+                        break;
 
                     case CsgOperator.Subtract:
                         _polyhedra.RemoveAt( polyIndex );
@@ -262,15 +262,15 @@ namespace Sandbox.Csg
 
                         renderMeshChanged = true;
                         collisionChanged = true;
-						break;
+                        break;
                 }
             }
 
             switch ( op )
             {
                 case CsgOperator.Add:
-					solid.InvalidateCollider();
-					_polyhedra.Add( solid );
+                    solid.InvalidateCollider();
+                    _polyhedra.Add( solid );
                     renderMeshChanged = true;
                     collisionChanged = true;
                     break;

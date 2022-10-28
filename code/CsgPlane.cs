@@ -123,8 +123,8 @@ namespace Sandbox.Csg
                 cutNormal = cutNormal.Normal;
 
                 var cutNormal2 = new Vector2(
-	                Vector3.Dot(cutNormal, Tu),
-	                Vector3.Dot(cutNormal, Tv));
+                    Vector3.Dot(cutNormal, Tu),
+                    Vector3.Dot(cutNormal, Tv));
 
                 cutNormal2 = cutNormal2.Normal;
 
@@ -188,8 +188,8 @@ namespace Sandbox.Csg
                     -Vector3.Dot( newHelper.Tu, newTangent ) );
 
                 var midPos2 = new Vector2(
-	                Vector3.Dot( newHelper.Tu, midPos3 ),
-	                Vector3.Dot( newHelper.Tv, midPos3 ) );
+                    Vector3.Dot( newHelper.Tu, midPos3 ),
+                    Vector3.Dot( newHelper.Tv, midPos3 ) );
 
                 var min = Vector3.Dot( minPos3, newTangent );
                 var max = Vector3.Dot( maxPos3, newTangent );

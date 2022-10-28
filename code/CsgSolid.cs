@@ -8,60 +8,60 @@ namespace Sandbox.Csg
         private readonly List<CsgConvexSolid> _polyhedra = new List<CsgConvexSolid>();
 
         [Event.Tick.Server]
-		private void ServerTick()
-		{
-			CollisionUpdate();
-		}
-		
-		[Event.Tick.Client]
+        private void ServerTick()
+        {
+            CollisionUpdate();
+        }
+        
+        [Event.Tick.Client]
         private void ClientTick()
-		{
-			if ( !IsClientOnly && !_copiedInitialGeometry && ServerDisconnectedFrom != null )
-			{
-				if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
-				{
-					ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
+        {
+            if ( !IsClientOnly && !_copiedInitialGeometry && ServerDisconnectedFrom != null )
+            {
+                if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
+                {
+                    ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
 
-					_copiedInitialGeometry = true;
-					_appliedModifications = 0;
+                    _copiedInitialGeometry = true;
+                    _appliedModifications = 0;
 
-					ClearPolyhedra();
+                    ClearPolyhedra();
 
-					_polyhedra.AddRange( clientCopy._polyhedra );
-					clientCopy._polyhedra.Clear();
+                    _polyhedra.AddRange( clientCopy._polyhedra );
+                    clientCopy._polyhedra.Clear();
 
-					foreach ( var poly in _polyhedra )
-					{
-						poly.Collider = null;
-						poly.InvalidateMesh();
-					}
+                    foreach ( var poly in _polyhedra )
+                    {
+                        poly.Collider = null;
+                        poly.InvalidateMesh();
+                    }
 
-					clientCopy.Delete();
+                    clientCopy.Delete();
 
-					_collisionInvalid = true;
-					_meshInvalid = true;
+                    _collisionInvalid = true;
+                    _meshInvalid = true;
 
-					OnModificationsChanged();
-				}
-			}
+                    OnModificationsChanged();
+                }
+            }
 
-			CollisionUpdate();
-			MeshUpdate();
-		}
+            CollisionUpdate();
+            MeshUpdate();
+        }
 
         private void ClearPolyhedra()
-		{
-			foreach ( var poly in _polyhedra )
-	        {
-		        poly.Dispose();
-			}
+        {
+            foreach ( var poly in _polyhedra )
+            {
+                poly.Dispose();
+            }
 
-			_polyhedra.Clear();
+            _polyhedra.Clear();
         }
 
         void OnDrawGizmosSelected()
         {
-	        foreach ( var poly in _polyhedra )
+            foreach ( var poly in _polyhedra )
             {
                 poly.DrawGizmos();
             }

@@ -9,7 +9,7 @@ namespace Sandbox.Csg
         public const float UnitEpsilon = 9.5367431640625E-7f; // 0x35800000
         public const float DistanceEpsilon = 0.00390625f; // 0x3b800000
 
-		[ThreadStatic]
+        [ThreadStatic]
         private static List<List<CsgConvexSolid.FaceCut>> _sFaceCutListPool;
 
         private const int FaceCutPoolCapacity = 8;
@@ -57,9 +57,9 @@ namespace Sandbox.Csg
 
         private static int NextPowerOfTwo( int value )
         {
-	        var po2 = 1;
-	        while ( po2 < value ) po2 <<= 1;
-	        return po2;
+            var po2 = 1;
+            while ( po2 < value ) po2 <<= 1;
+            return po2;
         }
 
         public static void EnsureCapacity<T>( ref T[] array, int minSize )
@@ -139,7 +139,7 @@ namespace Sandbox.Csg
 
         public static float Dot( Vector2 a, Vector2 b )
         {
-	        return a.x * b.x + a.y * b.y;
+            return a.x * b.x + a.y * b.y;
         }
 
         public static bool Split( this List<CsgConvexSolid.FaceCut> faceCuts, CsgConvexSolid.FaceCut splitCut, List<CsgConvexSolid.FaceCut> outNegative = null )
@@ -160,7 +160,7 @@ namespace Sandbox.Csg
             {
                 foreach ( var faceCut in faceCuts )
                 {
-	                var cross = Cross( splitCut.Normal, faceCut.Normal );
+                    var cross = Cross( splitCut.Normal, faceCut.Normal );
                     var dot = Dot( splitCut.Normal, faceCut.Normal );
 
                     if ( Math.Abs( cross ) <= UnitEpsilon )

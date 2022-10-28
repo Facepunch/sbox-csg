@@ -39,13 +39,13 @@ namespace Sandbox.Csg
         public int ClientDisconnectionIndex { get; set; }
 
         [Net]
-		public int ServerDisconnectionIndex { get; set; }
+        public int ServerDisconnectionIndex { get; set; }
 
-		private bool _copiedInitialGeometry;
+        private bool _copiedInitialGeometry;
 
-		private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new ();
+        private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new ();
 
-		private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
+        private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
             out HashSet<CsgConvexSolid> visited, out Queue<CsgConvexSolid> queue )
         {
             chunks = _sChunks ??= new List<(CsgConvexSolid, int, float)>();
@@ -97,22 +97,22 @@ namespace Sandbox.Csg
 
         private void ConnectivityUpdate()
         {
-	        if ( !_connectivityInvalid ) return;
+            if ( !_connectivityInvalid ) return;
 
-	        _connectivityInvalid = false;
-			
-			if ( _polyhedra.Count == 0 )
+            _connectivityInvalid = false;
+            
+            if ( _polyhedra.Count == 0 )
             {
-	            if ( IsClientOnly || IsServer )
-				{
-					Delete();
-				}
-	            else
-	            {
-		            EnableDrawing = false;
-		            PhysicsEnabled = false;
-		            EnableSolidCollisions = false;
-	            }
+                if ( IsClientOnly || IsServer )
+                {
+                    Delete();
+                }
+                else
+                {
+                    EnableDrawing = false;
+                    PhysicsEnabled = false;
+                    EnableSolidCollisions = false;
+                }
 
                 return;
             }
@@ -124,13 +124,13 @@ namespace Sandbox.Csg
 
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
-	            Delete();
+                Delete();
                 return;
             }
 
             if ( !IsStatic && PhysicsBody != null )
             {
-	            PhysicsBody.Sleeping = false;
+                PhysicsBody.Sleeping = false;
             }
 
             if ( chunks.Count == 1 ) return;
@@ -154,16 +154,16 @@ namespace Sandbox.Csg
                 _polyhedra.RemoveAll( x => visited.Contains( x ) );
 
                 if ( chunk.Volume < MinVolume )
-				{
-					continue;
+                {
+                    continue;
                 }
 
-				var child = new CsgSolid
-				{
-					IsStatic = false,
-					PhysicsEnabled = true,
-					Transform = Transform
-				};
+                var child = new CsgSolid
+                {
+                    IsStatic = false,
+                    PhysicsEnabled = true,
+                    Transform = Transform
+                };
 
                 child._polyhedra.AddRange( visited );
                 child._meshInvalid = child._collisionInvalid = true;
@@ -172,15 +172,15 @@ namespace Sandbox.Csg
 
                 if ( IsServer )
                 {
-	                child.ServerDisconnectionIndex = disconnectionIndex;
-	                child.ServerDisconnectedFrom = this;
-				}
+                    child.ServerDisconnectionIndex = disconnectionIndex;
+                    child.ServerDisconnectedFrom = this;
+                }
 
                 if ( IsClient )
                 {
-	                child.ClientDisconnectionIndex = disconnectionIndex;
+                    child.ClientDisconnectionIndex = disconnectionIndex;
 
-	                ClientDisconnections.Add( disconnectionIndex, child );
+                    ClientDisconnections.Add( disconnectionIndex, child );
                 }
             }
         }

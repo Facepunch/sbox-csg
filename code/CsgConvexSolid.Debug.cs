@@ -7,12 +7,12 @@ namespace Sandbox.Csg
     {
         public void DrawGizmos()
         {
-	        foreach ( var face in _faces )
-	        {
-		        face.DrawGizmos( VertexAverage );
-	        }
+            foreach ( var face in _faces )
+            {
+                face.DrawGizmos( VertexAverage );
+            }
         }
-		
+        
         public override string ToString()
         {
             return $"[{Index}]";
@@ -69,7 +69,7 @@ namespace Sandbox.Csg
                         var size = Math.Clamp( Math.Min( t, l - t ), 0f, 1f ) * scale;
 
                         DebugOverlay.Line( mid + tangent * size, mid - normal * size, color: color );
-						DebugOverlay.Line( mid, mid - normal * size, color: color );
+                        DebugOverlay.Line( mid, mid - normal * size, color: color );
 
                         t -= arrowGap;
                     }
@@ -84,7 +84,7 @@ namespace Sandbox.Csg
                 
                 DrawFaceGizmos( FaceCuts, basis, 1f, Color.White );
 
-				foreach (var subFace in SubFaces)
+                foreach (var subFace in SubFaces)
                 {
                     var avgPos = DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f, Color.Green );
 

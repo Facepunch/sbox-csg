@@ -72,18 +72,18 @@ namespace Sandbox.Csg
 
             InvalidateCollider();
         }
-		
+        
         public CsgConvexSolid Clone()
         {
             var copy = new CsgConvexSolid
             {
-				Material = Material,
+                Material = Material,
                 IsEmpty = IsEmpty
             };
 
             foreach ( var face in _faces )
             {
-	            copy._faces.Add( face.Clone() );
+                copy._faces.Add( face.Clone() );
             }
 
             copy.InvalidateMesh();
@@ -142,22 +142,22 @@ namespace Sandbox.Csg
             var avgPos = Vector3.Zero;
             var posCount = 0;
 
-			const float volumeScale = 1.638716e-5f;
+            const float volumeScale = 1.638716e-5f;
 
-			foreach ( var face in _faces )
+            foreach ( var face in _faces )
             {
                 var basis = face.Plane.GetHelper();
 
                 foreach ( var cut in face.FaceCuts )
                 {
-	                if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
-	                {
-		                _volume = float.PositiveInfinity;
-		                _vertexMin = float.NegativeInfinity;
-		                _vertexMax = float.PositiveInfinity;
-		                _vertexAverage = 0f;
-		                return;
-	                }
+                    if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
+                    {
+                        _volume = float.PositiveInfinity;
+                        _vertexMin = float.NegativeInfinity;
+                        _vertexMax = float.PositiveInfinity;
+                        _vertexAverage = 0f;
+                        return;
+                    }
 
                     var a = basis.GetPoint( cut, cut.Min );
                     var b = basis.GetPoint( cut, cut.Max );
@@ -196,22 +196,22 @@ namespace Sandbox.Csg
 
                     b = c;
                 }
-			}
+            }
 
-			_volume = volume * volumeScale / 6f;
+            _volume = volume * volumeScale / 6f;
         }
 
         public void Dispose()
-		{
-			RemoveCollider();
+        {
+            RemoveCollider();
         }
 
         ~CsgConvexSolid()
         {
-	        if ( Collider.IsValid() )
-	        {
-		        Log.Warning( "Collider not disposed!" );
-	        }
+            if ( Collider.IsValid() )
+            {
+                Log.Warning( "Collider not disposed!" );
+            }
         }
     }
 }
