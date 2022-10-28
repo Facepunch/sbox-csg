@@ -17,7 +17,8 @@ namespace Sandbox.Csg
 
 	    private int _appliedModifications;
 
-	    [Net, Change] public IList<Modification> Modifications { get; set; }
+	    [Net, Change, HideInEditor]
+	    public IList<Modification> Modifications { get; set; }
 
 		[ThreadStatic]
 	    private static List<CsgConvexSolid> _sModifySolids;
@@ -236,7 +237,8 @@ namespace Sandbox.Csg
             switch ( op )
             {
                 case CsgOperator.Add:
-                    _polyhedra.Add( solid );
+					solid.InvalidateCollider();
+					_polyhedra.Add( solid );
                     renderMeshChanged = true;
                     collisionChanged = true;
                     break;

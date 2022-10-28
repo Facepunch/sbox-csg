@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Sandbox.Csg
@@ -7,6 +8,7 @@ namespace Sandbox.Csg
     partial class CsgSolid : IHotloadManaged
     {
         private Mesh _mesh;
+        private Model _model;
 
         private bool _meshInvalid;
         private bool _collisionInvalid;
@@ -23,7 +25,7 @@ namespace Sandbox.Csg
         }
 
 		private void CollisionUpdate()
-        {
+		{
 	        if ( !_collisionInvalid && _body.IsValid() || _polyhedra.Count == 0 ) return;
 
 	        _collisionInvalid = false;
@@ -32,42 +34,50 @@ namespace Sandbox.Csg
 			{
 				foreach ( var poly in _polyhedra )
 				{
-					poly.InvalidateCollider();
+					poly.Collider = null;
 				}
 				
-				SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
+				var group = SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
 
-		        if ( !PhysicsBody.IsValid() )
+		        if ( !group.IsValid() )
 		        {
-			        Log.Error( "Unable to set up physics body" );
 			        return;
 		        }
 
-		        _body = PhysicsBody;
+				_body = group.GetBody( 0 );
 				_body.ClearShapes();
 			}
 			
 	        const float density = 25f;
 
 	        var mass = 0f;
+	        var volume = 0f;
 
 	        foreach ( var poly in _polyhedra )
 	        {
 		        poly.UpdateCollider( _body );
 
 		        mass += poly.Volume * density;
+		        volume += poly.Volume;
 	        }
+			
+	        Volume = volume;
 
-	        if ( _body.IsValid() && !IsStatic )
+			if ( _body.IsValid() && !IsStatic )
 			{
 				_body.Mass = mass;
 				_body.RebuildMass();
+				_body.Sleeping = false;
 			}
         }
-
-        private void MeshUpdate()
-        {
-	        if ( !_meshInvalid || _polyhedra.Count == 0 ) return;
+		
+		private void MeshUpdate()
+		{
+			if ( _mesh is { IsValid: true } && _model != null && _model == Model && !_meshInvalid ||
+			     _polyhedra.Count == 0 )
+			{
+				return;
+			}
 
 	        _meshInvalid = false;
 
@@ -76,20 +86,23 @@ namespace Sandbox.Csg
 		        var material = Material.Load( "materials/csgdemo/default.vmat" );
 
 		        _mesh = new Mesh( material );
-	        }
+			}
 
-	        UpdateMesh( _mesh, _polyhedra );
+			UpdateMesh( _mesh, _polyhedra );
 
-	        if ( Model == null )
-	        {
-		        var modelBuilder = new ModelBuilder();
+			if ( _model is not { MeshCount: > 0 } )
+			{
+			    var modelBuilder = new ModelBuilder();
 
-		        modelBuilder.AddMesh( _mesh );
+			    modelBuilder.AddMesh( _mesh );
 
-		        Model = modelBuilder.Create();
-	        }
+			    _model = modelBuilder.Create();
+			}
 
-	        EnableDrawing = true;
+			Model = null;
+			Model = _model;
+
+			EnableDrawing = true;
 	        EnableShadowCasting = true;
 		}
 

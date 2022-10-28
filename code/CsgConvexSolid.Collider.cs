@@ -21,14 +21,14 @@ namespace Sandbox.Csg
 	        if ( Collider.IsValid() && Collider.Body.IsValid() )
 	        {
 		        Collider?.Remove();
-	        }
+			}
 
 	        Collider = null;
         }
 
 		public void UpdateCollider( PhysicsBody body )
         {
-	        if ( Collider.IsValid() ) return;
+	        if ( Collider.IsValid() && Collider.Body == body ) return;
 
 	        RemoveCollider();
 

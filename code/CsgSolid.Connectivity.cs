@@ -100,7 +100,7 @@ namespace Sandbox.Csg
 	        if ( !_connectivityInvalid ) return;
 
 	        _connectivityInvalid = false;
-
+			
 			if ( _polyhedra.Count == 0 )
             {
 	            if ( IsClientOnly || IsServer )
@@ -124,11 +124,9 @@ namespace Sandbox.Csg
 
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
-				Delete();
+	            Delete();
                 return;
             }
-
-            Volume = chunks[0].Volume;
 
             if ( !IsStatic && PhysicsBody != null )
             {
@@ -176,7 +174,6 @@ namespace Sandbox.Csg
                 {
 	                child.ServerDisconnectionIndex = disconnectionIndex;
 	                child.ServerDisconnectedFrom = this;
-					child.ServerTick();
 				}
 
                 if ( IsClient )
@@ -184,8 +181,6 @@ namespace Sandbox.Csg
 	                child.ClientDisconnectionIndex = disconnectionIndex;
 
 	                ClientDisconnections.Add( disconnectionIndex, child );
-
-					child.ClientTick();
                 }
             }
         }

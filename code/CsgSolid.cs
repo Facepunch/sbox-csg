@@ -24,22 +24,23 @@ namespace Sandbox.Csg
 
 					_copiedInitialGeometry = true;
 					_appliedModifications = 0;
-					
+
 					ClearPolyhedra();
 
 					_polyhedra.AddRange( clientCopy._polyhedra );
-					
+					clientCopy._polyhedra.Clear();
+
 					foreach ( var poly in _polyhedra )
 					{
 						poly.Collider = null;
 						poly.InvalidateMesh();
 					}
-					
+
 					clientCopy.Delete();
 
 					_collisionInvalid = true;
 					_meshInvalid = true;
-					
+
 					OnModificationsChanged();
 				}
 			}
@@ -49,11 +50,11 @@ namespace Sandbox.Csg
 		}
 
         private void ClearPolyhedra()
-        {
-	        foreach ( var poly in _polyhedra )
+		{
+			foreach ( var poly in _polyhedra )
 	        {
 		        poly.Dispose();
-	        }
+			}
 
 			_polyhedra.Clear();
         }
