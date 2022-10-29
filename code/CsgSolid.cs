@@ -5,7 +5,16 @@ namespace Sandbox.Csg
 {
     public partial class CsgSolid : ModelEntity
     {
+	    public const bool LogTimings = false;
+
         private readonly List<CsgConvexSolid> _polyhedra = new List<CsgConvexSolid>();
+
+        public override void Spawn()
+        {
+	        base.Spawn();
+
+	        Transmit = TransmitType.Always;
+        }
 
         [Event.Tick.Server]
 		private void ServerTick()
@@ -21,9 +30,9 @@ namespace Sandbox.Csg
 				CheckInitialGeometry();
 			}
 
-			CollisionUpdate();
 			MeshUpdate();
-        }
+			CollisionUpdate();
+		}
 
         private void ClearPolyhedra()
         {

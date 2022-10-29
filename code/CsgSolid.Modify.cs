@@ -124,6 +124,8 @@ namespace Sandbox.Csg
 				return ConnectivityUpdate();
 			}
 
+			Timer.Restart();
+
             _sModifySolids ??= new List<CsgConvexSolid>();
             _sModifySolids.Clear();
 
@@ -143,9 +145,14 @@ namespace Sandbox.Csg
                 solid.Material = material;
                 solid.Transform( modification.Transform );
                 changed |= Modify( solid, modification.Operator );
-            }
+			}
 
-            return changed;
+            if ( LogTimings )
+			{
+				Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+			}
+
+			return changed;
         }
 
         private bool Modify( CsgConvexSolid solid, CsgOperator op )

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -7,57 +8,64 @@ namespace Sandbox.Csg
 {
     public record struct SubFaceIndices( int PolyIndex, int FaceIndex, int SubFaceIndex, int MaterialIndex );
 
-    partial class CsgSolid : IHotloadManaged
+    partial class CsgSolid
     {
+	    private static Stopwatch Timer { get; } = new Stopwatch();
+
         private readonly Dictionary<int, Mesh> _meshes = new();
-        private Model _model;
 
         private bool _meshInvalid;
         private bool _collisionInvalid;
 
-        private PhysicsBody _body;
+        private bool _firstCollisionUpdate = true;
 
         public float Volume { get; private set; }
         public bool IsStatic { get; set; } = true;
-        
-        public void Created( IReadOnlyDictionary<string, object> state )
-        {
-            _meshInvalid = true;
-            _collisionInvalid = true;
-        }
 
         private void CollisionUpdate()
         {
-            if ( !_collisionInvalid && _body.IsValid() || _polyhedra.Count == 0 ) return;
+            if ( _polyhedra.Count == 0 || !_collisionInvalid && _polyhedra[0].Collider.IsValid() ) return;
 
             _collisionInvalid = false;
-            
-            if ( !_body.IsValid() )
-            {
-                foreach ( var poly in _polyhedra )
+
+            Timer.Restart();
+
+            if ( !PhysicsBody.IsValid() )
+			{
+				if ( LogTimings )
+				{
+					Log.Info( $"{Host.Name} Creating physics body for {Name}" );
+				}
+
+				SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
+
+				foreach ( var poly in _polyhedra )
                 {
                     poly.Collider = null;
                 }
-                
-                var group = SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
 
-                if ( !group.IsValid() )
-                {
-                    return;
-                }
+				Assert.True( PhysicsBody.IsValid() );
 
-                _body = group.GetBody( 0 );
-                _body.ClearShapes();
-            }
-            
-            const float density = 25f;
+				_firstCollisionUpdate = true;
+			}
+
+            if ( _firstCollisionUpdate )
+            {
+	            _firstCollisionUpdate = false;
+
+	            PhysicsBody.ClearShapes();
+			}
+
+			const float density = 25f;
 
             var mass = 0f;
             var volume = 0f;
 
+            var body = PhysicsBody;
+
             foreach ( var poly in _polyhedra )
             {
-                poly.UpdateCollider( _body );
+                poly.UpdateCollider( body );
 
                 mass += poly.Volume * density;
                 volume += poly.Volume;
@@ -65,26 +73,33 @@ namespace Sandbox.Csg
             
             Volume = volume;
 
-            if ( _body.IsValid() && !IsStatic )
+            if ( !IsStatic )
             {
-                _body.Mass = mass;
-                _body.RebuildMass();
-                _body.Sleeping = false;
+	            body.Mass = mass;
+	            body.RebuildMass();
+	            body.Sleeping = false;
+			}
+
+            if ( LogTimings )
+            {
+	            Log.Info( $"{Host.Name} Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {PhysicsBody.Shapes.Count()}" );
             }
         }
         
         private void MeshUpdate()
         {
-            if ( !_meshInvalid && _model is { IsProcedural: true } || _polyhedra.Count == 0 )
+            if ( !_meshInvalid && Model is { IsProcedural: true } || _polyhedra.Count == 0 )
             {
                 return;
             }
 
             _meshInvalid = false;
 
-            var newMeshes = UpdateMeshes( _meshes, _polyhedra );
+            Timer.Restart();
 
-            if ( _model is not { IsProcedural: true } || newMeshes )
+			var newMeshes = UpdateMeshes( _meshes, _polyhedra );
+
+            if ( Model is not { IsProcedural: true } || newMeshes )
             {
                 var modelBuilder = new ModelBuilder();
 
@@ -93,14 +108,16 @@ namespace Sandbox.Csg
                     modelBuilder.AddMesh( pair.Value );
                 }
 
-                _model = modelBuilder.Create();
+                Model = modelBuilder.Create();
             }
-
-            Model = null;
-            Model = _model;
 
             EnableDrawing = true;
             EnableShadowCasting = true;
+
+            if ( LogTimings )
+            {
+	            Log.Info( $"{Host.Name} Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+            }
         }
 
         [ThreadStatic]
