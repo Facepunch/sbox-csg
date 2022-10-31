@@ -2,7 +2,7 @@
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         /// <summary>
         /// Split this solid by the given plane, returning the negative side.
@@ -10,7 +10,7 @@ namespace Sandbox.Csg
         /// <param name="plane">Plane to split by.</param>
         /// <param name="faceCuts">Optional constraints on the split plane.</param>
         /// <returns>If a split occurred, returns a new solid with the removed faces. Otherwise null.</returns>
-        public CsgConvexSolid Split( CsgPlane plane, List<FaceCut> faceCuts = null )
+        public CsgHull Split( CsgPlane plane, List<FaceCut> faceCuts = null )
         {
             return Split( plane, faceCuts, false ).NegativeSolid;
         }
@@ -26,7 +26,7 @@ namespace Sandbox.Csg
             return Split( plane, faceCuts, true ).Changed;
         }
         
-        private (bool Changed, CsgConvexSolid NegativeSolid) Split( CsgPlane cutPlane, List<FaceCut> faceCuts, bool discard )
+        private (bool Changed, CsgHull NegativeSolid) Split( CsgPlane cutPlane, List<FaceCut> faceCuts, bool discard )
         {
             if ( IsEmpty ) return (false, null);
 
@@ -70,7 +70,7 @@ namespace Sandbox.Csg
 
                 var negSolid = discard
                     ? null
-                    : new CsgConvexSolid
+                    : new CsgHull
                     {
                         Material = Material
                     };
@@ -196,7 +196,10 @@ namespace Sandbox.Csg
                 negSolid?._faces.Add( posSplitFace.CloneFlipped( this ) );
 
                 InvalidateMesh();
+                InvalidateCollision();
+
                 negSolid?.InvalidateMesh();
+                negSolid?.InvalidateCollision();
 
                 return (true, negSolid);
             }
@@ -207,7 +210,7 @@ namespace Sandbox.Csg
             }
         }
 
-        public void Remove( CsgConvexSolid replacement )
+        public void SetEmpty( CsgHull replacement )
         {
             foreach ( var face in _faces )
             {
@@ -220,13 +223,17 @@ namespace Sandbox.Csg
             _faces.Clear();
             IsEmpty = true;
 
+            UpdateVertexProperties();
+
+            InvalidateCollision();
             InvalidateMesh();
-            RemoveCollider();
         }
 
-        private void ReplaceNeighbor( CsgPlane plane, CsgConvexSolid oldNeighbor, CsgConvexSolid newNeighbor )
+        private bool ReplaceNeighbor( CsgPlane plane, CsgHull oldNeighbor, CsgHull newNeighbor )
         {
-            if ( !TryGetFace( plane, out var face ) ) return;
+            if ( !TryGetFace( plane, out var face ) ) return false;
+
+            var changed = false;
 
             for ( var i = 0; i < face.SubFaces.Count; ++i )
             {
@@ -236,18 +243,29 @@ namespace Sandbox.Csg
                 
                 subFace.Neighbor = newNeighbor;
                 face.SubFaces[i] = subFace;
+
+                changed = true;
             }
+
+            if ( changed )
+            {
+                InvalidateMesh();
+            }
+
+            return changed;
         }
 
-        private void ReplaceNeighbor( CsgPlane plane, CsgConvexSolid oldNeighbor, CsgConvexSolid newNeighbor, CsgPlane cutPlane )
+        private bool ReplaceNeighbor( CsgPlane plane, CsgHull oldNeighbor, CsgHull newNeighbor, CsgPlane cutPlane )
         {
-            if ( !TryGetFace( plane, out var face ) ) return;
+            if ( !TryGetFace( plane, out var face ) ) return false;
             
             var helper = plane.GetHelper();
 
             var faceCut = helper.GetCut( cutPlane );
             
             var negCuts = CsgHelpers.RentFaceCutList();
+
+            var changed = false;
 
             try
             {
@@ -268,7 +286,16 @@ namespace Sandbox.Csg
                     
                     subFace.Neighbor = newNeighbor;
                     face.SubFaces[i] = subFace;
+
+                    changed = true;
                 }
+
+                if ( changed )
+                {
+                    InvalidateMesh();
+                }
+
+                return changed;
             }
             finally
             {
@@ -279,9 +306,11 @@ namespace Sandbox.Csg
         /// <summary>
         /// Merge sub-faces from another solid.
         /// </summary>
-        public void MergeSubFacesFrom( CsgConvexSolid other )
+        public bool MergeSubFacesFrom( CsgHull other )
         {
-            if ( other.IsEmpty || IsEmpty ) return;
+            if ( other.IsEmpty || IsEmpty ) return false;
+
+            var changed = false;
 
             foreach ( var thisFace in _faces )
             {
@@ -289,7 +318,7 @@ namespace Sandbox.Csg
                 {
                     continue;
                 }
-                
+
                 thisFace.RemoveSubFacesInside( otherFace.FaceCuts );
 
                 // Now just add the sub-faces from other
@@ -299,8 +328,17 @@ namespace Sandbox.Csg
                     thisFace.SubFaces.Add( subFace.Clone() );
 
                     subFace.Neighbor?.ReplaceNeighbor( -thisFace.Plane, other, this );
+
+                    changed = true;
                 }
             }
+
+            if ( changed )
+            {
+                InvalidateMesh();
+            }
+
+            return changed;
         }
     }
 }

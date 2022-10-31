@@ -25,9 +25,9 @@ namespace Sandbox.Csg
 
         public List<ConvexSolid> ConvexSolids { get; set; }
 
-        private List<CsgConvexSolid> _solids;
+        private List<CsgHull> _solids;
 
-        public int CreateSolids( List<CsgConvexSolid> outSolids )
+        public int CreateSolids( List<CsgHull> outSolids )
         {
             UpdateSolids();
 
@@ -43,13 +43,13 @@ namespace Sandbox.Csg
         {
             if ( _solids != null ) return;
 
-            _solids = new List<CsgConvexSolid>();
+            _solids = new List<CsgHull>();
 
             if ( ConvexSolids == null ) return;
 
             foreach ( var solidInfo in ConvexSolids )
             {
-                var solid = new CsgConvexSolid();
+                var solid = new CsgHull();
 
                 if ( solidInfo.Planes != null )
                 {

@@ -10,12 +10,7 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-	    private static Stopwatch Timer { get; } = new Stopwatch();
-
-        private readonly Dictionary<int, Mesh> _meshes = new();
-
-        private bool _meshInvalid;
-        private bool _collisionInvalid;
+        private static Stopwatch Timer { get; } = new Stopwatch();
 
         private bool _firstCollisionUpdate = true;
 
@@ -24,88 +19,116 @@ namespace Sandbox.Csg
 
         private void CollisionUpdate()
         {
-            if ( _polyhedra.Count == 0 || !_collisionInvalid && _polyhedra[0].Collider.IsValid() ) return;
-
-            _collisionInvalid = false;
-
-            Timer.Restart();
-
             if ( !PhysicsBody.IsValid() )
-			{
-				if ( LogTimings )
-				{
-					Log.Info( $"{Host.Name} Creating physics body for {Name}" );
-				}
-
-				SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
-
-				foreach ( var poly in _polyhedra )
+            {
+                if ( LogTimings )
                 {
-                    poly.Collider = null;
+                    Log.Info( $"{Host.Name} Creating physics body for {Name}" );
                 }
 
-				Assert.True( PhysicsBody.IsValid() );
+                SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
 
-				_firstCollisionUpdate = true;
-			}
+                Assert.True( PhysicsBody.IsValid() );
+
+                _firstCollisionUpdate = true;
+            }
 
             if ( _firstCollisionUpdate )
             {
-	            _firstCollisionUpdate = false;
+                _firstCollisionUpdate = false;
 
-	            PhysicsBody.ClearShapes();
-			}
-
-			const float density = 25f;
-
-            var mass = 0f;
-            var volume = 0f;
-
-            var body = PhysicsBody;
-
-            foreach ( var poly in _polyhedra )
-            {
-                poly.UpdateCollider( body );
-
-                mass += poly.Volume * density;
-                volume += poly.Volume;
+                PhysicsBody.ClearShapes();
             }
-            
-            Volume = volume;
-
-            if ( !IsStatic )
-            {
-	            body.Mass = mass;
-	            body.RebuildMass();
-	            body.Sleeping = false;
-			}
-
-            if ( LogTimings )
-            {
-	            Log.Info( $"{Host.Name} Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {PhysicsBody.Shapes.Count()}" );
-            }
-        }
-        
-        private void MeshUpdate()
-        {
-            if ( !_meshInvalid && Model is { IsProcedural: true } || _polyhedra.Count == 0 )
-            {
-                return;
-            }
-
-            _meshInvalid = false;
 
             Timer.Restart();
 
-			var newMeshes = UpdateMeshes( _meshes, _polyhedra );
+            var changed = false;
 
-            if ( Model is not { IsProcedural: true } || newMeshes )
+            var body = PhysicsBody;
+
+            var totalVolume = 0f;
+            var totalMass = 0f;
+
+            var changedColliders = 0;
+
+            foreach ( var (_, cell) in _grid )
+            {
+                if ( !cell.CollisionInvalid && (cell.Hulls.Count == 0 || cell.Hulls[0].Collider.IsValid()) )
+                {
+                    totalVolume += cell.Volume;
+                    totalMass += cell.Mass;
+                    continue;
+                }
+
+                cell.CollisionInvalid = false;
+
+                changed = true;
+
+                var mass = 0f;
+                var volume = 0f;
+
+                foreach ( var hull in cell.Hulls )
+                {
+                    if ( hull.UpdateCollider( body ) )
+                    {
+                        changedColliders++;
+                    }
+
+                    mass += hull.Volume * hull.Material.Density;
+                    volume += hull.Volume;
+                }
+
+                totalMass += cell.Mass = mass;
+                totalVolume += cell.Volume = volume;
+            }
+
+            if ( !changed ) return;
+
+            Volume = totalVolume;
+
+            if ( !IsStatic )
+            {
+                body.Mass = totalMass;
+                body.RebuildMass();
+                body.Sleeping = false;
+            }
+
+            if ( LogTimings )
+            {
+                Log.Info( $"{Host.Name} Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {changedColliders} of {PhysicsBody.Shapes.Count()}" );
+            }
+        }
+
+        private void MeshUpdate()
+        {
+            Timer.Restart();
+
+            var newMeshes = Model is not { IsProcedural: true };
+            var changed = newMeshes;
+
+            foreach ( var (_, cell) in _grid )
+            {
+                if ( !cell.MeshInvalid ) continue;
+
+                changed = true;
+
+                cell.MeshInvalid = false;
+
+                newMeshes |= UpdateMeshes( cell.Meshes, cell.Hulls );
+            }
+
+            if ( !changed ) return;
+
+            if ( newMeshes )
             {
                 var modelBuilder = new ModelBuilder();
 
-                foreach ( var pair in _meshes )
+                foreach ( var (_, cell) in _grid )
                 {
-                    modelBuilder.AddMesh( pair.Value );
+                    foreach ( var (_, mesh) in cell.Meshes )
+                    {
+                        modelBuilder.AddMesh( mesh );
+                    }
                 }
 
                 Model = modelBuilder.Create();
@@ -116,7 +139,7 @@ namespace Sandbox.Csg
 
             if ( LogTimings )
             {
-	            Log.Info( $"{Host.Name} Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+                Log.Info( $"{Host.Name} Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
             }
         }
 
@@ -130,7 +153,7 @@ namespace Sandbox.Csg
         private static List<int> _sIndices;
 
         private static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
-            where T : IList<CsgConvexSolid>
+            where T : IList<CsgHull>
         {
             _sSubFaces ??= new List<SubFaceIndices>();
             _sVertices ??= new List<CsgVertex>();
@@ -169,7 +192,7 @@ namespace Sandbox.Csg
                 {
                     lastMaterialIndex = nextIndices.MaterialIndex;
                     material = ResourceLibrary.Get<CsgMaterial>( nextIndices.MaterialIndex );
-                    
+
                     UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
 
                     _sVertices.Clear();
@@ -187,10 +210,12 @@ namespace Sandbox.Csg
 
                 poly.WriteMeshSubFaces( _sSubFaces, ref offset, material, _sVertices, _sIndices );
 
-                mins = Vector3.Min( mins, poly.VertexMin );
-                maxs = Vector3.Max( maxs, poly.VertexMax );
+                var bounds = poly.VertexBounds;
+
+                mins = Vector3.Min( mins, bounds.Mins );
+                maxs = Vector3.Max( maxs, bounds.Maxs );
             }
-            
+
             UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
 
             return newMeshes;
@@ -231,7 +256,7 @@ namespace Sandbox.Csg
         };
     }
 
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         public void FindSubFaces( int polyIndex, List<SubFaceIndices> subFaces )
         {
@@ -248,7 +273,7 @@ namespace Sandbox.Csg
                     if ( subFace.Neighbor != null ) continue;
                     if ( subFace.FaceCuts.Count < 3 ) continue;
 
-                    subFaces.Add( new (polyIndex, faceIndex, subFaceIndex, subFace.Material?.ResourceId ?? materialId ) );
+                    subFaces.Add( new( polyIndex, faceIndex, subFaceIndex, subFace.Material?.ResourceId ?? materialId ) );
                 }
             }
         }

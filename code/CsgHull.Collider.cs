@@ -4,19 +4,23 @@ using System.Linq;
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         public PhysicsShape Collider { get; internal set; }
 
         [ThreadStatic]
         private static List<Vector3> _sPhysicsHullVertices;
 
-        public void InvalidateCollider()
+        public void InvalidateCollision()
         {
+            if ( GridCell != null ) GridCell.CollisionInvalid = true;
+
+            _vertexPropertiesInvalid = true;
+
             RemoveCollider();
         }
 
-        private void RemoveCollider()
+        public void RemoveCollider()
         {
             if ( Collider.IsValid() && Collider.Body.IsValid() )
             {
@@ -26,9 +30,9 @@ namespace Sandbox.Csg
             Collider = null;
         }
 
-        public void UpdateCollider( PhysicsBody body )
+        public bool UpdateCollider( PhysicsBody body )
         {
-            if ( Collider.IsValid() ) return;
+            if ( Collider.IsValid() ) return false;
 
             RemoveCollider();
 
@@ -49,6 +53,8 @@ namespace Sandbox.Csg
             }
 
             Collider = body.AddHullShape( Vector3.Zero, Rotation.Identity, vertices );
+
+            return true;
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         public void DrawGizmos()
         {

@@ -10,37 +10,58 @@ namespace Sandbox.Csg
         public const float DistanceEpsilon = 0.00390625f; // 0x3b800000
 
         [ThreadStatic]
-        private static List<List<CsgConvexSolid.FaceCut>> _sFaceCutListPool;
+        private static List<List<CsgHull.FaceCut>> _sFaceCutListPool;
+        [ThreadStatic]
+        private static List<List<CsgHull>> _sHullListPool;
 
-        private const int FaceCutPoolCapacity = 8;
+        private const int PoolCapacity = 8;
 
-        public static List<CsgConvexSolid.FaceCut> RentFaceCutList()
+        private static List<T> RentList<T>( ref List<List<T>> pool )
         {
-            if ( _sFaceCutListPool == null )
+            if ( pool == null )
             {
-                _sFaceCutListPool = new List<List<CsgConvexSolid.FaceCut>>(
-                    Enumerable.Range( 0, FaceCutPoolCapacity ).Select( x => new List<CsgConvexSolid.FaceCut>() ) );
+                pool = new List<List<T>>( Enumerable.Range( 0, PoolCapacity ).Select( x => new List<T>() ) );
             }
 
-            if ( _sFaceCutListPool.Count == 0 )
+            if ( pool.Count == 0 )
             {
-                Log.Warning( "Face cut list pool is empty!" );
-                _sFaceCutListPool.Add( new List<CsgConvexSolid.FaceCut>() );
+                Log.Warning( $"Pool of List<{typeof(T)}> is empty!" );
+                pool.Add( new List<T>() );
             }
 
-            var list = _sFaceCutListPool[_sFaceCutListPool.Count - 1];
-            _sFaceCutListPool.RemoveAt( _sFaceCutListPool.Count - 1 );
+            var list = pool[pool.Count - 1];
+            pool.RemoveAt( pool.Count - 1 );
 
             list.Clear();
 
             return list;
         }
 
-        public static void ReturnFaceCutList( List<CsgConvexSolid.FaceCut> list )
+        private static void ReturnList<T>( List<List<T>> pool, List<T> list )
         {
-            if ( _sFaceCutListPool.Count >= FaceCutPoolCapacity ) return;
+            if ( pool.Count >= PoolCapacity ) return;
 
-            _sFaceCutListPool.Add( list );
+            pool.Add( list );
+        }
+
+        public static List<CsgHull.FaceCut> RentFaceCutList()
+        {
+            return RentList( ref _sFaceCutListPool );
+        }
+
+        public static void ReturnFaceCutList( List<CsgHull.FaceCut> list )
+        {
+            ReturnList( _sFaceCutListPool, list );
+        }
+
+        public static List<CsgHull> RentHullList()
+        {
+            return RentList( ref _sHullListPool );
+        }
+
+        public static void ReturnHullList( List<CsgHull> list )
+        {
+            ReturnList( _sHullListPool, list );
         }
 
         public static Vector3 GetTangent( this Vector3 normal )
@@ -82,7 +103,7 @@ namespace Sandbox.Csg
             return a.x * b.y - a.y * b.x;
         }
 
-        public static void Flip( this List<CsgConvexSolid.FaceCut> faceCuts,
+        public static void Flip( this List<CsgHull.FaceCut> faceCuts,
             in CsgPlane.Helper oldHelper, in CsgPlane.Helper newHelper )
         {
             for ( var i = 0; i < faceCuts.Count; i++ )
@@ -91,7 +112,7 @@ namespace Sandbox.Csg
             }
         }
 
-        public static bool IsDegenerate( this List<CsgConvexSolid.FaceCut> faceCuts )
+        public static bool IsDegenerate( this List<CsgHull.FaceCut> faceCuts )
         {
             if ( faceCuts == null )
             {
@@ -107,7 +128,7 @@ namespace Sandbox.Csg
             return faceCuts.Count < 3;
         }
 
-        public static bool Contains( this List<CsgConvexSolid.FaceCut> faceCuts, Vector2 pos )
+        public static bool Contains( this List<CsgHull.FaceCut> faceCuts, Vector2 pos )
         {
             foreach ( var faceCut in faceCuts )
             {
@@ -120,7 +141,7 @@ namespace Sandbox.Csg
             return true;
         }
 
-        public static Vector2 GetAveragePos( this List<CsgConvexSolid.FaceCut> faceCuts )
+        public static Vector2 GetAveragePos( this List<CsgHull.FaceCut> faceCuts )
         {
             if ( faceCuts.Count == 0 )
             {
@@ -142,7 +163,7 @@ namespace Sandbox.Csg
             return a.x * b.x + a.y * b.y;
         }
 
-        public static bool Split( this List<CsgConvexSolid.FaceCut> faceCuts, CsgConvexSolid.FaceCut splitCut, List<CsgConvexSolid.FaceCut> outNegative = null )
+        public static bool Split( this List<CsgHull.FaceCut> faceCuts, CsgHull.FaceCut splitCut, List<CsgHull.FaceCut> outNegative = null )
         {
             outNegative?.Clear();
 
@@ -153,7 +174,7 @@ namespace Sandbox.Csg
 
             var outPositive = RentFaceCutList();
 
-            var newCut = new CsgConvexSolid.FaceCut( splitCut.Normal, splitCut.Distance,
+            var newCut = new CsgHull.FaceCut( splitCut.Normal, splitCut.Distance,
                 float.NegativeInfinity, float.PositiveInfinity );
 
             try

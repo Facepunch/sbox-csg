@@ -30,6 +30,8 @@ namespace Sandbox.Csg
         [ResourceType( "vtex" ), ShowIf( nameof(TextureMode), CsgTextureMode.Triplanar )]
         public string TextureZ { get; set; }
 
+        public float Density { get; set; } = 25f;
+
         private Material _runtimeMaterial;
 
         [HideInEditor]

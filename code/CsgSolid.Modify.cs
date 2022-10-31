@@ -22,7 +22,7 @@ namespace Sandbox.Csg
         public IList<Modification> Modifications { get; set; }
 
         [ThreadStatic]
-        private static List<CsgConvexSolid> _sModifySolids;
+        private static List<CsgHull> _sModifySolids;
 
         private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
@@ -83,6 +83,8 @@ namespace Sandbox.Csg
 
         private void OnModificationsChanged()
         {
+            if ( _grid == null ) return;
+
             if ( ServerDisconnectedFrom != null && !_copiedInitialGeometry )
             {
                 return;
@@ -126,7 +128,7 @@ namespace Sandbox.Csg
 
             Timer.Restart();
 
-            _sModifySolids ??= new List<CsgConvexSolid>();
+            _sModifySolids ??= new List<CsgHull>();
             _sModifySolids.Clear();
 
             brush.CreateSolids( _sModifySolids );
@@ -137,13 +139,6 @@ namespace Sandbox.Csg
             {
                 solid.Material = material;
                 solid.Transform( modification.Transform );
-            }
-
-            if ( modification.Operator == CsgOperator.Add )
-            {
-                SubdivideGridAxis( new Vector3( 1f, 0f, 0f ), _sModifySolids );
-                SubdivideGridAxis( new Vector3( 0f, 1f, 0f ), _sModifySolids );
-                SubdivideGridAxis( new Vector3( 0f, 0f, 1f ), _sModifySolids );
             }
 
             foreach ( var solid in _sModifySolids )
@@ -159,152 +154,157 @@ namespace Sandbox.Csg
             return changed;
         }
 
-        private bool Modify( CsgConvexSolid solid, CsgOperator op )
+        private bool Modify( CsgHull solid, CsgOperator op )
         {
-            var renderMeshChanged = false;
-            var collisionChanged = false;
-
             if ( solid.IsEmpty ) return false;
 
             var faces = solid.Faces;
+            var bounds = solid.VertexBounds;
 
-            var min = solid.VertexMin - CsgHelpers.DistanceEpsilon;
-            var max = solid.VertexMax + CsgHelpers.DistanceEpsilon;
-            
-            for ( var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex )
+            var nearbyHulls = CsgHelpers.RentHullList();
+            var addedHulls = CsgHelpers.RentHullList();
+            var removedHulls = CsgHelpers.RentHullList();
+
+            var changed = false;
+
+            try
             {
-                var next = _polyhedra[polyIndex];
+                GetHullsTouching( bounds, nearbyHulls );
 
-                if ( next.IsEmpty )
+                foreach ( var next in nearbyHulls )
                 {
-                    _polyhedra.RemoveAt( polyIndex );
-                    continue;
-                }
+                    var skip = false;
 
-                var nextMin = next.VertexMin;
-                var nextMax = next.VertexMax;
-
-                if ( nextMin.x > max.x || nextMin.y > max.y || nextMin.z > max.z ) continue;
-                if ( nextMax.x < min.x || nextMax.y < min.y || nextMax.z < min.z ) continue;
-
-                var skip = false;
-
-                switch ( op )
-                {
-                    case CsgOperator.Replace:
-                        next.Paint( solid, null );
-                        skip = next.Material == solid.Material;
-                        break;
-
-                    case CsgOperator.Paint:
-                        renderMeshChanged |= next.Paint( solid, solid.Material );
-                        skip = true;
-                        break;
-
-                    case CsgOperator.Add:
-                        for ( var faceIndex = 0; faceIndex < faces.Count; ++faceIndex )
-                        {
-                            var solidFace = faces[faceIndex];
-
-                            if ( !next.TryGetFace( -solidFace.Plane, out var nextFace ) )
-                            {
-                                continue;
-                            }
-
-                            skip = true;
-
-                            if ( ConnectFaces( solidFace, solid, nextFace, next ) )
-                            {
-                                renderMeshChanged = true;
-                            }
-
-                            break;
-                        }
-                        break;
-                }
-
-                if ( skip ) continue;
-
-                for ( var faceIndex = 0; faceIndex < faces.Count && !next.IsEmpty; ++faceIndex )
-                {
-                    var face = faces[faceIndex];
-                    var child = next.Split( face.Plane, face.FaceCuts );
-
-                    if ( child == null )
+                    switch ( op )
                     {
+                        case CsgOperator.Replace:
+                            changed |= next.Paint( solid, null );
+                            skip = next.Material == solid.Material;
+                            break;
+
+                        case CsgOperator.Paint:
+                            changed |= next.Paint( solid, solid.Material );
+                            skip = true;
+                            break;
+
+                        case CsgOperator.Add:
+                            for ( var faceIndex = 0; faceIndex < faces.Count; ++faceIndex )
+                            {
+                                var solidFace = faces[faceIndex];
+
+                                if ( !next.TryGetFace( -solidFace.Plane, out var nextFace ) )
+                                {
+                                    continue;
+                                }
+
+                                skip = true;
+                                changed |= ConnectFaces( solidFace, solid, nextFace, next );
+                                break;
+                            }
+                            break;
+                    }
+
+                    if ( skip ) continue;
+
+                    for ( var faceIndex = 0; faceIndex < faces.Count && !next.IsEmpty; ++faceIndex )
+                    {
+                        var face = faces[faceIndex];
+                        var child = next.Split( face.Plane, face.FaceCuts );
+
+                        if ( child == null )
+                        {
+                            continue;
+                        }
+
+                        changed = true;
+
+                        if ( child.Faces.Count < 4 )
+                        {
+                            child.SetEmpty( null );
+                        }
+                        else if ( !child.IsEmpty )
+                        {
+                            addedHulls.Add( child );
+                        }
+
+                        if ( next.Faces.Count < 4 )
+                        {
+                            next.SetEmpty( null );
+                        }
+                    }
+
+                    if ( next.IsEmpty )
+                    {
+                        changed = true;
+
+                        removedHulls.Add( next );
                         continue;
                     }
 
-                    renderMeshChanged = true;
-                    collisionChanged = true;
+                    if ( solid.GetSign( next.VertexAverage ) < 0 ) continue;
 
-                    if ( child.Faces.Count < 4 )
-                    {
-                        child.Remove( null );
-                    }
-                    else
-                    {
-                        _polyhedra.Add( child );
-                    }
+                    // next will now contain only the intersection with solid.
+                    // We'll copy its faces and remove it
 
-                    if ( next.Faces.Count < 4 )
+                    switch ( op )
                     {
-                        next.Remove( null );
+                        case CsgOperator.Replace:
+                            changed = true;
+
+                            next.Material = solid.Material;
+                            next.InvalidateMesh();
+                            break;
+
+                        case CsgOperator.Add:
+                            changed = true;
+
+                            removedHulls.Add( next );
+
+                            solid.MergeSubFacesFrom( next );
+                            next.SetEmpty( null );
+                            break;
+
+                        case CsgOperator.Subtract:
+                            changed = true;
+
+                            removedHulls.Add( next );
+
+                            next.SetEmpty( null );
+                            break;
                     }
                 }
-
-                if ( !next.IsEmpty && solid.GetSign( next.VertexAverage ) < 0 ) continue;
-                
-                // next will now contain only the intersection with solid.
-                // We'll copy its faces and remove it
 
                 switch ( op )
                 {
-                    case CsgOperator.Replace:
-                        next.Material = solid.Material;
-
-                        renderMeshChanged = true;
-                        break;
-
                     case CsgOperator.Add:
-                        _polyhedra.RemoveAt( polyIndex );
+                        changed = true;
 
-                        solid.MergeSubFacesFrom( next );
-                        next.Remove( null );
-
-                        renderMeshChanged = true;
-                        collisionChanged = true;
-                        break;
-
-                    case CsgOperator.Subtract:
-                        _polyhedra.RemoveAt( polyIndex );
-
-                        next.Remove( null );
-
-                        renderMeshChanged = true;
-                        collisionChanged = true;
+                        solid.RemoveCollider();
+                        addedHulls.Add( solid );
                         break;
                 }
-            }
 
-            switch ( op )
+                foreach ( var hull in removedHulls )
+                {
+                    RemoveHull( hull );
+                }
+
+                foreach ( var hull in addedHulls )
+                {
+                    AddHull( hull );
+                }
+            }
+            finally
             {
-                case CsgOperator.Add:
-                    solid.InvalidateCollider();
-                    _polyhedra.Add( solid );
-                    renderMeshChanged = true;
-                    collisionChanged = true;
-                    break;
+                CsgHelpers.ReturnHullList( nearbyHulls );
+                CsgHelpers.ReturnHullList( addedHulls );
+                CsgHelpers.ReturnHullList( removedHulls );
             }
 
-            _meshInvalid |= renderMeshChanged;
-            _collisionInvalid |= collisionChanged;
-            _connectivityInvalid |= collisionChanged;
-
-            return renderMeshChanged;
+            return changed;
         }
 
-        private static bool ConnectFaces( CsgConvexSolid.Face faceA, CsgConvexSolid solidA, CsgConvexSolid.Face faceB, CsgConvexSolid solidB )
+        private static bool ConnectFaces( CsgHull.Face faceA, CsgHull solidA, CsgHull.Face faceB, CsgHull solidB )
         {
             var intersectionCuts = CsgHelpers.RentFaceCutList();
 
@@ -326,9 +326,9 @@ namespace Sandbox.Csg
                 }
 
                 faceA.RemoveSubFacesInside( intersectionCuts );
-                faceA.SubFaces.Add( new CsgConvexSolid.SubFace
+                faceA.SubFaces.Add( new CsgHull.SubFace
                 {
-                    FaceCuts = new List<CsgConvexSolid.FaceCut>( intersectionCuts ),
+                    FaceCuts = new List<CsgHull.FaceCut>( intersectionCuts ),
                     Neighbor = solidB
                 } );
 
@@ -338,11 +338,14 @@ namespace Sandbox.Csg
                 }
 
                 faceB.RemoveSubFacesInside( intersectionCuts );
-                faceB.SubFaces.Add( new CsgConvexSolid.SubFace
+                faceB.SubFaces.Add( new CsgHull.SubFace
                 {
-                    FaceCuts = new List<CsgConvexSolid.FaceCut>( intersectionCuts ),
+                    FaceCuts = new List<CsgHull.FaceCut>( intersectionCuts ),
                     Neighbor = solidA
                 } );
+
+                solidA.InvalidateMesh();
+                solidB.InvalidateMesh();
 
                 return true;
             }

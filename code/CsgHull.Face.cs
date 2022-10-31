@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         public partial struct Face : IEquatable<Face>
         {
@@ -33,7 +33,7 @@ namespace Sandbox.Csg
                 return copy;
             }
 
-            public Face CloneFlipped( CsgConvexSolid neighbor )
+            public Face CloneFlipped( CsgHull neighbor )
             {
                 var copy = new Face
                 {
@@ -111,7 +111,7 @@ namespace Sandbox.Csg
         public partial struct SubFace
         {
             public List<FaceCut> FaceCuts;
-            public CsgConvexSolid Neighbor;
+            public CsgHull Neighbor;
             public CsgMaterial Material;
 
             public SubFace Clone()

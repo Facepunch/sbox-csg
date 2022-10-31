@@ -1,11 +1,12 @@
 ﻿
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         public void Transform( in Matrix matrix )
         {
             InvalidateMesh();
+            InvalidateCollision();
 
             for ( var i = 0; i < _faces.Count; ++i )
             {

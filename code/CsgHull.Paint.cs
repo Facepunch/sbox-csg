@@ -6,14 +6,14 @@ using System.Threading.Tasks;
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
         private bool ShouldPaintSubFace( SubFace subFace, CsgMaterial material )
         {
             return subFace.Neighbor == null && (subFace.Material ?? Material) != (material ?? Material);
         }
 
-        public bool Paint( CsgConvexSolid brush, CsgMaterial material )
+        public bool Paint( CsgHull brush, CsgMaterial material )
         {
             var paintCuts = CsgHelpers.RentFaceCutList();
             var negCuts = CsgHelpers.RentFaceCutList();
@@ -92,6 +92,8 @@ namespace Sandbox.Csg
                         face.SubFaces[i] = subFace;
                     }
                 }
+
+                if ( changed ) InvalidateMesh();
 
                 return changed;
             }

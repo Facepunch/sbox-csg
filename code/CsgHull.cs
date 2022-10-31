@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Sandbox.Csg
 {
-    public partial class CsgConvexSolid : IDisposable
+    public partial class CsgHull
     {
         private readonly List<Face> _faces = new List<Face>();
 
@@ -13,6 +13,9 @@ namespace Sandbox.Csg
 
         public CsgMaterial Material { get; set; }
 
+        internal (int X, int Y, int Z) GridCoord { get; set; }
+        internal CsgSolid.GridCell GridCell { get; set; }
+
         public bool IsEmpty { get; private set; }
         public bool IsFinite => !float.IsPositiveInfinity( Volume );
 
@@ -21,8 +24,7 @@ namespace Sandbox.Csg
         private bool _vertexPropertiesInvalid = true;
 
         private Vector3 _vertexAverage;
-        private Vector3 _vertexMin;
-        private Vector3 _vertexMax;
+        private BBox _vertexBBox;
         private float _volume;
 
         public Vector3 VertexAverage
@@ -34,21 +36,12 @@ namespace Sandbox.Csg
             }
         }
 
-        public Vector3 VertexMin
+        public BBox VertexBounds
         {
             get
             {
                 UpdateVertexProperties();
-                return _vertexMin;
-            }
-        }
-
-        public Vector3 VertexMax
-        {
-            get
-            {
-                UpdateVertexProperties();
-                return _vertexMax;
+                return _vertexBBox;
             }
         }
 
@@ -61,21 +54,19 @@ namespace Sandbox.Csg
             }
         }
 
-        public CsgConvexSolid()
+        public CsgHull()
         {
             Index = NextIndex++;
         }
 
         public void InvalidateMesh()
         {
-            _vertexPropertiesInvalid = true;
-
-            InvalidateCollider();
+            if ( GridCell != null ) GridCell.MeshInvalid = true;
         }
         
-        public CsgConvexSolid Clone()
+        public CsgHull Clone()
         {
-            var copy = new CsgConvexSolid
+            var copy = new CsgHull
             {
                 Material = Material,
                 IsEmpty = IsEmpty
@@ -87,6 +78,7 @@ namespace Sandbox.Csg
             }
 
             copy.InvalidateMesh();
+            copy.InvalidateCollision();
 
             return copy;
         }
@@ -131,8 +123,7 @@ namespace Sandbox.Csg
             if ( IsEmpty )
             {
                 _vertexAverage = Vector3.Zero;
-                _vertexMin = Vector3.Zero;
-                _vertexMax = Vector3.Zero;
+                _vertexBBox = default;
                 _volume = 0f;
                 return;
             }
@@ -153,8 +144,7 @@ namespace Sandbox.Csg
                     if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
                     {
                         _volume = float.PositiveInfinity;
-                        _vertexMin = float.NegativeInfinity;
-                        _vertexMax = float.PositiveInfinity;
+                        _vertexBBox = new BBox( float.NegativeInfinity, float.PositiveInfinity );
                         _vertexAverage = 0f;
                         return;
                     }
@@ -174,8 +164,7 @@ namespace Sandbox.Csg
             }
 
             _vertexAverage = posCount == 0 ? Vector3.Zero : avgPos / posCount;
-            _vertexMin = min;
-            _vertexMax = max;
+            _vertexBBox = new BBox( min, max );
 
             var volume = 0f;
 
@@ -201,12 +190,7 @@ namespace Sandbox.Csg
             _volume = volume * volumeScale / 6f;
         }
 
-        public void Dispose()
-        {
-            RemoveCollider();
-        }
-
-        ~CsgConvexSolid()
+        ~CsgHull()
         {
             if ( Collider.IsValid() )
             {

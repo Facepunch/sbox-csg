@@ -106,7 +106,7 @@ namespace Sandbox.Csg
                 Origin = Normal * plane.Distance;
             }
 
-            public CsgConvexSolid.FaceCut GetCut( CsgPlane cutPlane )
+            public CsgHull.FaceCut GetCut( CsgPlane cutPlane )
             {
                 if (1f - Math.Abs(Vector3.Dot(Normal, cutPlane.Normal)) <= CsgHelpers.UnitEpsilon)
                 {
@@ -114,7 +114,7 @@ namespace Sandbox.Csg
 
                     var dot = Vector3.Dot(Normal, cutPlane.Normal);
 
-                    return dot * Offset - cutPlane.Distance > CsgHelpers.DistanceEpsilon ? CsgConvexSolid.FaceCut.ExcludeNone : CsgConvexSolid.FaceCut.ExcludeAll;
+                    return dot * Offset - cutPlane.Distance > CsgHelpers.DistanceEpsilon ? CsgHull.FaceCut.ExcludeNone : CsgHull.FaceCut.ExcludeAll;
                 }
 
                 var cutTangent = Vector3.Cross(Normal, cutPlane.Normal);
@@ -131,15 +131,15 @@ namespace Sandbox.Csg
                 var t = Vector3.Dot(cutPlane.Normal * cutPlane.Distance - Origin, cutPlane.Normal)
                         / Vector3.Dot(cutPlane.Normal, cutNormal);
 
-                return new CsgConvexSolid.FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
+                return new CsgHull.FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
             }
 
-            public Vector3 GetPoint( CsgConvexSolid.FaceCut cut )
+            public Vector3 GetPoint( CsgHull.FaceCut cut )
             {
                 return GetPoint( cut, cut.Mid );
             }
 
-            public Vector3 GetPoint( CsgConvexSolid.FaceCut cut, float along )
+            public Vector3 GetPoint( CsgHull.FaceCut cut, float along )
             {
                 var pos = cut.Normal * cut.Distance + new Vector2(-cut.Normal.y, cut.Normal.x) * Math.Clamp(along,
                     float.IsNegativeInfinity(cut.Min) ? -1024f : cut.Min,
@@ -148,7 +148,7 @@ namespace Sandbox.Csg
                 return Origin + Tu * pos.x + Tv * pos.y;
             }
 
-            public Vector3 GetAveragePos( List<CsgConvexSolid.FaceCut> faceCuts )
+            public Vector3 GetAveragePos( List<CsgHull.FaceCut> faceCuts )
             {
                 if ( faceCuts.Count == 0 )
                 {
@@ -160,7 +160,7 @@ namespace Sandbox.Csg
                 return Normal * Offset + Tu * avgPos.x + Tv * avgPos.y;
             }
 
-            public CsgConvexSolid.FaceCut Transform( CsgConvexSolid.FaceCut cut, in Helper newHelper, in Matrix? matrix = null )
+            public CsgHull.FaceCut Transform( CsgHull.FaceCut cut, in Helper newHelper, in Matrix? matrix = null )
             {
                 if ( float.IsNegativeInfinity( cut.Min ) || float.IsPositiveInfinity( cut.Max ) )
                 {
@@ -194,7 +194,7 @@ namespace Sandbox.Csg
                 var min = Vector3.Dot( minPos3, newTangent );
                 var max = Vector3.Dot( maxPos3, newTangent );
 
-                return new CsgConvexSolid.FaceCut( normal, Vector3.Dot( normal, midPos2 ),
+                return new CsgHull.FaceCut( normal, Vector3.Dot( normal, midPos2 ),
                     Math.Min( min, max ), Math.Max( min, max ) );
             }
         }

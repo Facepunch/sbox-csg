@@ -4,9 +4,9 @@ using System.Linq;
 
 namespace Sandbox.Csg
 {
-    partial class CsgConvexSolid
+    partial class CsgHull
     {
-        public void AddNeighbors( HashSet<CsgConvexSolid> visited, Queue<CsgConvexSolid> queue )
+        public void AddNeighbors( HashSet<CsgHull> visited, Queue<CsgHull> queue )
         {
             foreach ( var face in _faces )
             {
@@ -25,9 +25,9 @@ namespace Sandbox.Csg
     {
         public const float MinVolume = 0.125f;
 
-        [ThreadStatic] private static List<(CsgConvexSolid, int, float)> _sChunks;
-        [ThreadStatic] private static HashSet<CsgConvexSolid> _sVisited;
-        [ThreadStatic] private static Queue<CsgConvexSolid> _sVisitQueue;
+        [ThreadStatic] private static List<(CsgHull, int, float)> _sChunks;
+        [ThreadStatic] private static HashSet<CsgHull> _sVisited;
+        [ThreadStatic] private static Queue<CsgHull> _sVisitQueue;
 
         private bool _connectivityInvalid;
 
@@ -43,96 +43,115 @@ namespace Sandbox.Csg
 
         private bool _copiedInitialGeometry;
 
-        private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new ();
+        private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new();
 
-        private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
-            out HashSet<CsgConvexSolid> visited, out Queue<CsgConvexSolid> queue )
+        private static void GetConnectivityContainers( out List<(CsgHull Root, int Count, float Volume)> chunks,
+            out HashSet<CsgHull> visited, out Queue<CsgHull> queue )
         {
-            chunks = _sChunks ??= new List<(CsgConvexSolid, int, float)>();
-            visited = _sVisited ??= new HashSet<CsgConvexSolid>();
-            queue = _sVisitQueue ??= new Queue<CsgConvexSolid>();
+            chunks = _sChunks ??= new List<(CsgHull, int, float)>();
+            visited = _sVisited ??= new HashSet<CsgHull>();
+            queue = _sVisitQueue ??= new Queue<CsgHull>();
 
             chunks.Clear();
             visited.Clear();
             queue.Clear();
         }
 
-        private void FindChunks( List<(CsgConvexSolid Root, int Count, float Volume)> chunks, HashSet<CsgConvexSolid> visited, Queue<CsgConvexSolid> queue )
+        private void FindChunks( List<(CsgHull Root, int Count, float Volume)> chunks, HashSet<CsgHull> visited, Queue<CsgHull> queue )
         {
-            while ( visited.Count < _polyhedra.Count )
+            var allHulls = CsgHelpers.RentHullList();
+
+            try
             {
-                queue.Clear();
+                GetHullsTouching( new BBox( float.NegativeInfinity, float.PositiveInfinity ), allHulls );
 
-                CsgConvexSolid root = null;
-
-                foreach ( var poly in _polyhedra )
+                while ( visited.Count < allHulls.Count )
                 {
-                    if ( visited.Contains( poly ) ) continue;
+                    queue.Clear();
 
-                    root = poly;
-                    break;
+                    CsgHull root = null;
+
+                    foreach ( var hull in allHulls )
+                    {
+                        if ( visited.Contains( hull ) ) continue;
+
+                        root = hull;
+                        break;
+                    }
+
+                    Assert.NotNull( root );
+
+                    visited.Add( root );
+                    queue.Enqueue( root );
+
+                    var volume = 0f;
+                    var count = 0;
+
+                    while ( queue.Count > 0 )
+                    {
+                        var next = queue.Dequeue();
+
+                        volume += next.Volume;
+                        count += 1;
+
+                        next.AddNeighbors( visited, queue );
+                    }
+
+                    chunks.Add( (root, count, volume) );
                 }
-
-                Assert.NotNull( root );
-
-                visited.Add( root );
-                queue.Enqueue( root );
-
-                var volume = 0f;
-                var count = 0;
-
-                while ( queue.Count > 0 )
-                {
-                    var next = queue.Dequeue();
-
-                    volume += next.Volume;
-                    count += 1;
-
-                    next.AddNeighbors( visited, queue );
-                }
-
-                chunks.Add( (root, count, volume) );
+            }
+            finally
+            {
+                CsgHelpers.ReturnHullList( allHulls );
             }
         }
 
         private void CheckInitialGeometry()
         {
-	        if ( _copiedInitialGeometry || ServerDisconnectedFrom == null ) return;
+            if ( _copiedInitialGeometry || ServerDisconnectedFrom == null ) return;
 
-	        if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
-	        {
-		        ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
+            if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
+            {
+                ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
 
-		        _copiedInitialGeometry = true;
-		        _appliedModifications = 0;
+                _copiedInitialGeometry = true;
+                _appliedModifications = 0;
 
-		        ClearPolyhedra();
+                Assert.AreEqual( _gridSize, clientCopy._gridSize );
 
-		        _polyhedra.AddRange( clientCopy._polyhedra );
-		        clientCopy._polyhedra.Clear();
+                Clear( true );
 
-		        foreach ( var poly in _polyhedra )
-		        {
-			        poly.Collider = null;
-			        poly.InvalidateMesh();
-		        }
+                foreach ( var pair in clientCopy._grid )
+                {
+                    _grid.Add( pair.Key, pair.Value );
 
-		        clientCopy.Delete();
+                    pair.Value.Solid = this;
 
-		        _collisionInvalid = true;
-		        _meshInvalid = true;
+                    foreach ( var hull in pair.Value.Hulls )
+                    {
+                        hull.RemoveCollider();
+                    }
+                }
 
-		        OnModificationsChanged();
-	        }
-		}
+                clientCopy.Clear( false );
+                clientCopy.Delete();
+
+                OnModificationsChanged();
+            }
+        }
 
         private bool ConnectivityUpdate()
         {
             if ( !_connectivityInvalid ) return false;
 
             _connectivityInvalid = false;
-            
-            if ( _polyhedra.Count == 0 )
+
+            GetConnectivityContainers( out var chunks, out var visited, out var queue );
+            FindChunks( chunks, visited, queue );
+
+            chunks.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
+
+            if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
                 if ( IsClientOnly || IsServer )
                 {
@@ -145,17 +164,6 @@ namespace Sandbox.Csg
                     EnableSolidCollisions = false;
                 }
 
-                return true;
-            }
-
-            GetConnectivityContainers( out var chunks, out var visited, out var queue );
-            FindChunks( chunks, visited, queue );
-
-            chunks.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
-
-            if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
-            {
-                Delete();
                 return true;
             }
 
@@ -178,26 +186,26 @@ namespace Sandbox.Csg
                 {
                     var next = queue.Dequeue();
 
-                    next.InvalidateMesh();
                     next.AddNeighbors( visited, queue );
                 }
 
-                _polyhedra.RemoveAll( x => visited.Contains( x ) );
-
-                if ( chunk.Volume < MinVolume )
-                {
-                    continue;
-                }
-
-                var child = new CsgSolid
+                var child = chunk.Volume < MinVolume ? null : new CsgSolid( 0f )
                 {
                     IsStatic = false,
                     PhysicsEnabled = true,
                     Transform = Transform
                 };
 
-                child._polyhedra.AddRange( visited );
-                child._meshInvalid = child._collisionInvalid = true;
+                foreach ( var hull in visited )
+                {
+                    RemoveHull( hull );
+                    child?.AddHull( hull );
+                }
+
+                if ( child == null )
+                {
+                    continue;
+                }
 
                 var disconnectionIndex = _nextDisconnectionIndex++;
 
