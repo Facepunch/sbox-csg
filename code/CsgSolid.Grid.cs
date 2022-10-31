@@ -10,10 +10,6 @@ namespace Sandbox.Csg
 
         private void SubdivideGridAxis( Vector3 axis, List<CsgConvexSolid> polys )
         {
-            return;
-
-            // TODO
-
             var gridSize = Vector3.Dot( axis, GridSize );
 
             if ( gridSize <= 0f ) return;
@@ -34,7 +30,7 @@ namespace Sandbox.Csg
                 {
                     var plane = new CsgPlane( axis, grid * gridSize );
                     var child = poly.Split( plane );
-
+                    
                     if ( child != null )
                     {
                         polys.Add( child );

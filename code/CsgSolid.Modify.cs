@@ -9,7 +9,7 @@ namespace Sandbox.Csg
         Subtract,
         Replace,
         Paint,
-		Disconnect
+        Disconnect
     }
 
     partial class CsgSolid
@@ -77,9 +77,9 @@ namespace Sandbox.Csg
         }
 
         public bool Disconnect()
-		{
-			return Modify( null, null, CsgOperator.Disconnect, default );
-		}
+        {
+            return Modify( null, null, CsgOperator.Disconnect, default );
+        }
 
         private void OnModificationsChanged()
         {
@@ -107,24 +107,24 @@ namespace Sandbox.Csg
             Host.AssertServer( nameof(Modify) );
 
             var mod = new Modification( brush?.ResourceId ?? 0, material?.ResourceId ?? 0, op, transform * WorldToLocal );
-			
+            
             if ( Modify( mod, brush, material ) )
-			{
-				Modifications.Add( mod );
-				return true;
-			}
+            {
+                Modifications.Add( mod );
+                return true;
+            }
 
             return false;
         }
 
         private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
         {
-	        if ( modification.Operator == CsgOperator.Disconnect )
-			{
-				return ConnectivityUpdate();
-			}
+            if ( modification.Operator == CsgOperator.Disconnect )
+            {
+                return ConnectivityUpdate();
+            }
 
-			Timer.Restart();
+            Timer.Restart();
 
             _sModifySolids ??= new List<CsgConvexSolid>();
             _sModifySolids.Clear();
@@ -132,6 +132,12 @@ namespace Sandbox.Csg
             brush.CreateSolids( _sModifySolids );
 
             var changed = false;
+
+            foreach ( var solid in _sModifySolids )
+            {
+                solid.Material = material;
+                solid.Transform( modification.Transform );
+            }
 
             if ( modification.Operator == CsgOperator.Add )
             {
@@ -142,17 +148,15 @@ namespace Sandbox.Csg
 
             foreach ( var solid in _sModifySolids )
             {
-                solid.Material = material;
-                solid.Transform( modification.Transform );
                 changed |= Modify( solid, modification.Operator );
-			}
+            }
 
             if ( LogTimings )
-			{
-				Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
-			}
+            {
+                Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+            }
 
-			return changed;
+            return changed;
         }
 
         private bool Modify( CsgConvexSolid solid, CsgOperator op )
@@ -193,7 +197,7 @@ namespace Sandbox.Csg
                         break;
 
                     case CsgOperator.Paint:
-	                    renderMeshChanged |= next.Paint( solid, solid.Material );
+                        renderMeshChanged |= next.Paint( solid, solid.Material );
                         skip = true;
                         break;
 
