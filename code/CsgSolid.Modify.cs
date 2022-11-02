@@ -14,12 +14,13 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-        public record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
+        private record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
 
         private int _appliedModifications;
+        private bool _connectivityInvalid;
 
         [Net, Change, HideInEditor]
-        public IList<Modification> Modifications { get; set; }
+        private IList<Modification> Modifications { get; set; }
 
         private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
@@ -73,7 +74,7 @@ namespace Sandbox.Csg
             return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
         }
 
-        public bool Disconnect()
+        private bool Disconnect()
         {
             return Modify( null, null, CsgOperator.Disconnect, default );
         }
@@ -128,7 +129,7 @@ namespace Sandbox.Csg
                 {
                     return ConnectivityUpdate();
                 }
-                
+
                 brush.CreateHulls( hulls );
 
                 var changed = false;
@@ -144,11 +145,16 @@ namespace Sandbox.Csg
                     changed |= Modify( solid, modification.Operator );
                 }
 
+                if ( changed && modification.Operator is CsgOperator.Add or CsgOperator.Subtract )
+                {
+                    _connectivityInvalid = true;
+                }
+
                 return changed;
             }
             finally
             {
-                CsgHelpers.ReturnHullList( hulls );
+                CsgHelpers.Return( hulls );
 
                 if ( LogTimings )
                 {
@@ -299,9 +305,9 @@ namespace Sandbox.Csg
             }
             finally
             {
-                CsgHelpers.ReturnHullList( nearbyHulls );
-                CsgHelpers.ReturnHullList( addedHulls );
-                CsgHelpers.ReturnHullList( removedHulls );
+                CsgHelpers.Return( nearbyHulls );
+                CsgHelpers.Return( addedHulls );
+                CsgHelpers.Return( removedHulls );
             }
 
             return changed;
@@ -354,7 +360,7 @@ namespace Sandbox.Csg
             }
             finally
             {
-                CsgHelpers.ReturnFaceCutList( intersectionCuts );
+                CsgHelpers.Return( intersectionCuts );
             }
         }
     }

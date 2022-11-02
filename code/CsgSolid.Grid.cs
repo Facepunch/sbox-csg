@@ -16,6 +16,8 @@ namespace Sandbox.Csg
         internal class GridCell
         {
             public List<CsgHull> Hulls { get; } = new List<CsgHull>();
+            public List<CsgIsland> Islands { get; } = new List<CsgIsland>();
+
             public Dictionary<int, Mesh> Meshes { get; } = new();
 
             public SceneObject SceneObject { get; set; }
@@ -27,14 +29,19 @@ namespace Sandbox.Csg
 
             public bool CollisionInvalid { get; set; }
             public bool MeshInvalid { get; set; }
-
-            public bool ConnectivityInvalid
+            public bool ConnectivityInvalid { get; set; }
+            
+            public CsgIsland GetOrCreateIsland( int index )
             {
-                set
-                {
-                    Assert.True( value );
-                    Solid._connectivityInvalid = true;
-                }
+                if ( index < Islands.Count ) return Islands[index];
+
+                Assert.AreEqual( Islands.Count, index );
+
+                var island = new CsgIsland();
+
+                Islands.Add( island );
+
+                return island;
             }
         }
 

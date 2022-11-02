@@ -88,7 +88,7 @@ namespace Sandbox.Csg
                 }
                 finally
                 {
-                    CsgHelpers.ReturnFaceCutList( negCuts );
+                    CsgHelpers.Return( negCuts );
                 }
             }
 

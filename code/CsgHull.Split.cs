@@ -205,8 +205,8 @@ namespace Sandbox.Csg
             }
             finally
             {
-                CsgHelpers.ReturnFaceCutList( splitFaceCuts );
-                CsgHelpers.ReturnFaceCutList( negCuts );
+                CsgHelpers.Return( splitFaceCuts );
+                CsgHelpers.Return( negCuts );
             }
         }
 
@@ -299,7 +299,7 @@ namespace Sandbox.Csg
             }
             finally
             {
-                CsgHelpers.ReturnFaceCutList( negCuts );
+                CsgHelpers.Return( negCuts );
             }
         }
         

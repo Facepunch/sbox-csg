@@ -5,7 +5,7 @@ namespace Sandbox.Csg
 {
     public partial class CsgSolid : ModelEntity
     {
-        public const bool LogTimings = false;
+        public const bool LogTimings = true;
 
         public CsgSolid()
         {
@@ -36,6 +36,13 @@ namespace Sandbox.Csg
         [Event.Tick.Server]
         private void ServerTick()
         {
+            if ( _connectivityInvalid )
+            {
+                _connectivityInvalid = false;
+
+                Disconnect();
+            }
+
             CollisionUpdate();
         }
 
@@ -60,6 +67,10 @@ namespace Sandbox.Csg
                     foreach ( var hull in pair.Value.Hulls )
                     {
                         hull.RemoveCollider();
+
+                        hull.Island = null;
+                        hull.GridCell = null;
+                        hull.GridCoord = default;
                     }
                 }
             }
@@ -107,7 +118,7 @@ namespace Sandbox.Csg
             }
             finally
             {
-                CsgHelpers.ReturnHullList( toAdd );
+                CsgHelpers.Return( toAdd );
             }
         }
 
@@ -125,6 +136,7 @@ namespace Sandbox.Csg
 
             hull.GridCoord = gridCoord;
             hull.GridCell = cell;
+            hull.Island = null;
 
             cell.Hulls.Add( hull );
             cell.CollisionInvalid = true;
@@ -149,6 +161,7 @@ namespace Sandbox.Csg
 
             hull.GridCell = null;
             hull.GridCoord = default;
+            hull.Island = null;
         }
     }
 }

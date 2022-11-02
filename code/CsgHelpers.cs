@@ -13,31 +13,32 @@ namespace Sandbox.Csg
         private static List<List<CsgHull.FaceCut>> _sFaceCutListPool;
         [ThreadStatic]
         private static List<List<CsgHull>> _sHullListPool;
+        [ThreadStatic]
+        private static List<HashSet<CsgHull>> _sHullSetPool;
 
         private const int PoolCapacity = 8;
 
-        private static List<T> RentList<T>( ref List<List<T>> pool )
+        private static T RentContainer<T>( ref List<T> pool )
+            where T : new()
         {
             if ( pool == null )
             {
-                pool = new List<List<T>>( Enumerable.Range( 0, PoolCapacity ).Select( x => new List<T>() ) );
+                pool = new List<T>( Enumerable.Range( 0, PoolCapacity ).Select( x => new T() ) );
             }
 
             if ( pool.Count == 0 )
             {
                 Log.Warning( $"Pool of List<{typeof(T)}> is empty!" );
-                pool.Add( new List<T>() );
+                pool.Add( new T() );
             }
 
             var list = pool[pool.Count - 1];
             pool.RemoveAt( pool.Count - 1 );
 
-            list.Clear();
-
             return list;
         }
 
-        private static void ReturnList<T>( List<List<T>> pool, List<T> list )
+        private static void ReturnContainer<T>( List<T> pool, T list )
         {
             if ( pool.Count >= PoolCapacity ) return;
 
@@ -46,22 +47,50 @@ namespace Sandbox.Csg
 
         public static List<CsgHull.FaceCut> RentFaceCutList()
         {
-            return RentList( ref _sFaceCutListPool );
+            var list = RentContainer( ref _sFaceCutListPool );
+
+            Assert.AreEqual( 0, list.Count );
+
+            return list;
         }
 
-        public static void ReturnFaceCutList( List<CsgHull.FaceCut> list )
+        public static void Return( List<CsgHull.FaceCut> list )
         {
-            ReturnList( _sFaceCutListPool, list );
+            list.Clear();
+
+            ReturnContainer( _sFaceCutListPool, list );
         }
 
         public static List<CsgHull> RentHullList()
         {
-            return RentList( ref _sHullListPool );
+            var list = RentContainer( ref _sHullListPool );
+
+            Assert.AreEqual( 0, list.Count );
+
+            return list;
         }
 
-        public static void ReturnHullList( List<CsgHull> list )
+        public static void Return( List<CsgHull> list )
         {
-            ReturnList( _sHullListPool, list );
+            list.Clear();
+
+            ReturnContainer( _sHullListPool, list );
+        }
+
+        public static HashSet<CsgHull> RentHullSet()
+        {
+            var list = RentContainer( ref _sHullSetPool );
+
+            Assert.AreEqual( 0, list.Count );
+
+            return list;
+        }
+
+        public static void Return( HashSet<CsgHull> set )
+        {
+            set.Clear();
+
+            ReturnContainer( _sHullSetPool, set );
         }
 
         public static Vector3 GetTangent( this Vector3 normal )
@@ -279,7 +308,7 @@ namespace Sandbox.Csg
             }
             finally
             {
-                ReturnFaceCutList( outPositive );
+                Return( outPositive );
             }
         }
     }
