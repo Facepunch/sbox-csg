@@ -103,39 +103,45 @@ namespace Sandbox.Csg
         {
             Timer.Restart();
 
-            var newMeshes = Model is not { IsProcedural: true };
-            var changed = newMeshes;
+            var changed = false;
 
             foreach ( var (_, cell) in _grid )
             {
-                if ( !cell.MeshInvalid ) continue;
+                if ( !cell.MeshInvalid && cell.SceneObject.IsValid() == cell.Hulls.Count > 0 )
+                {
+                    cell.SceneObject.Transform = Transform;
+                    continue;
+                }
 
                 changed = true;
 
                 cell.MeshInvalid = false;
 
-                newMeshes |= UpdateMeshes( cell.Meshes, cell.Hulls );
-            }
-
-            if ( !changed ) return;
-
-            if ( newMeshes )
-            {
-                var modelBuilder = new ModelBuilder();
-
-                foreach ( var (_, cell) in _grid )
+                if ( cell.Hulls.Count == 0 )
                 {
+                    cell.SceneObject?.Delete();
+                    continue;
+                }
+
+                if ( UpdateMeshes( cell.Meshes, cell.Hulls ) || !cell.SceneObject.IsValid() )
+                {
+                    var modelBuilder = new ModelBuilder();
+                    
                     foreach ( var (_, mesh) in cell.Meshes )
                     {
                         modelBuilder.AddMesh( mesh );
                     }
+
+                    var model = modelBuilder.Create();
+
+                    cell.SceneObject?.Delete();
+                    cell.SceneObject = new SceneObject( Scene, model );
                 }
 
-                Model = modelBuilder.Create();
+                cell.SceneObject.Transform = Transform;
             }
 
-            EnableDrawing = true;
-            EnableShadowCasting = true;
+            if ( !changed ) return;
 
             if ( LogTimings )
             {

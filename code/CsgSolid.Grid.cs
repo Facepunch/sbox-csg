@@ -18,6 +18,8 @@ namespace Sandbox.Csg
             public List<CsgHull> Hulls { get; } = new List<CsgHull>();
             public Dictionary<int, Mesh> Meshes { get; } = new();
 
+            public SceneObject SceneObject { get; set; }
+
             public CsgSolid Solid { get; set; }
 
             public float Volume { get; set; }
