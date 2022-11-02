@@ -5,7 +5,7 @@ namespace Sandbox.Csg
 {
     public partial class CsgSolid : ModelEntity
     {
-        public const bool LogTimings = true;
+        public const bool LogTimings = false;
 
         public CsgSolid()
         {

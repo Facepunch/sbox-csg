@@ -152,7 +152,7 @@ namespace Sandbox.Csg
             FindChunks( chunks, visited, queue );
 
             chunks.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
-
+            
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
                 if ( IsClientOnly || IsServer )

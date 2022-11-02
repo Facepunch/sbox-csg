@@ -21,9 +21,6 @@ namespace Sandbox.Csg
         [Net, Change, HideInEditor]
         public IList<Modification> Modifications { get; set; }
 
-        [ThreadStatic]
-        private static List<CsgHull> _sModifySolids;
-
         private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
             var transform = Matrix.Identity;
@@ -121,37 +118,43 @@ namespace Sandbox.Csg
 
         private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
         {
-            if ( modification.Operator == CsgOperator.Disconnect )
-            {
-                return ConnectivityUpdate();
-            }
-
             Timer.Restart();
 
-            _sModifySolids ??= new List<CsgHull>();
-            _sModifySolids.Clear();
+            var hulls = CsgHelpers.RentHullList();
 
-            brush.CreateSolids( _sModifySolids );
-
-            var changed = false;
-
-            foreach ( var solid in _sModifySolids )
+            try
             {
-                solid.Material = material;
-                solid.Transform( modification.Transform );
-            }
+                if ( modification.Operator == CsgOperator.Disconnect )
+                {
+                    return ConnectivityUpdate();
+                }
+                
+                brush.CreateHulls( hulls );
 
-            foreach ( var solid in _sModifySolids )
+                var changed = false;
+
+                foreach ( var solid in hulls )
+                {
+                    solid.Material = material;
+                    solid.Transform( modification.Transform );
+                }
+
+                foreach ( var solid in hulls )
+                {
+                    changed |= Modify( solid, modification.Operator );
+                }
+
+                return changed;
+            }
+            finally
             {
-                changed |= Modify( solid, modification.Operator );
-            }
+                CsgHelpers.ReturnHullList( hulls );
 
-            if ( LogTimings )
-            {
-                Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+                if ( LogTimings )
+                {
+                    Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+                }
             }
-
-            return changed;
         }
 
         private bool Modify( CsgHull solid, CsgOperator op )

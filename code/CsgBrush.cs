@@ -25,52 +25,52 @@ namespace Sandbox.Csg
 
         public List<ConvexSolid> ConvexSolids { get; set; }
 
-        private List<CsgHull> _solids;
+        private List<CsgHull> _hulls;
 
-        public int CreateSolids( List<CsgHull> outSolids )
+        public int CreateHulls( List<CsgHull> outHulls )
         {
             UpdateSolids();
 
-            foreach ( var solid in _solids )
+            foreach ( var hull in _hulls )
             {
-                outSolids.Add( solid.Clone() );
+                outHulls.Add( hull.Clone() );
             }
 
-            return _solids.Count;
+            return _hulls.Count;
         }
 
         private void UpdateSolids()
         {
-            if ( _solids != null ) return;
+            if ( _hulls != null ) return;
 
-            _solids = new List<CsgHull>();
+            _hulls = new List<CsgHull>();
 
             if ( ConvexSolids == null ) return;
 
             foreach ( var solidInfo in ConvexSolids )
             {
-                var solid = new CsgHull();
+                var hull = new CsgHull();
 
                 if ( solidInfo.Planes != null )
                 {
                     foreach ( var plane in solidInfo.Planes )
                     {
-                        solid.Clip( plane );
+                        hull.Clip( plane );
                     }
                 }
 
-                if ( solid.IsEmpty )
+                if ( hull.IsEmpty )
                 {
                     continue;
                 }
 
-                if ( !solid.IsFinite )
+                if ( !hull.IsFinite )
                 {
                     Log.Warning( "Incomplete convex solid" );
                     continue;
                 }
 
-                _solids.Add( solid );
+                _hulls.Add( hull );
             }
         }
 
@@ -78,14 +78,14 @@ namespace Sandbox.Csg
         {
             base.PostLoad();
 
-            _solids = null;
+            _hulls = null;
         }
 
         protected override void PostReload()
         {
             base.PostReload();
 
-            _solids = null;
+            _hulls = null;
         }
     }
 }
