@@ -63,7 +63,9 @@ namespace Sandbox.Csg
 
             try
             {
-                GetHullsTouching( new BBox( float.NegativeInfinity, float.PositiveInfinity ), allHulls );
+                GetAllHulls( allHulls );
+
+                Log.Info( $"Hull count: {allHulls.Count}" );
 
                 while ( visited.Count < allHulls.Count )
                 {
@@ -222,6 +224,8 @@ namespace Sandbox.Csg
                     ClientDisconnections.Add( disconnectionIndex, child );
                 }
             }
+
+            _connectivityInvalid = false;
 
             return true;
         }

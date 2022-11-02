@@ -27,6 +27,15 @@ namespace Sandbox.Csg
 
             public bool CollisionInvalid { get; set; }
             public bool MeshInvalid { get; set; }
+
+            public bool ConnectivityInvalid
+            {
+                set
+                {
+                    Assert.True( value );
+                    Solid._connectivityInvalid = true;
+                }
+            }
         }
 
         private Dictionary<(int X, int Y, int Z), GridCell> _grid;
@@ -101,8 +110,32 @@ namespace Sandbox.Csg
                 : default;
         }
 
+        private int GetAllHulls( List<CsgHull> outHulls )
+        {
+            var count = 0;
+
+            foreach ( var pair in _grid )
+            {
+                outHulls.AddRange( pair.Value.Hulls );
+                count += pair.Value.Hulls.Count;
+            }
+
+            return count;
+        }
+
         private int GetHullsTouching( BBox bounds, List<CsgHull> outHulls )
         {
+            Assert.False( bounds.Mins.IsNaN );
+            Assert.False( bounds.Maxs.IsNaN );
+
+            Assert.False( float.IsInfinity( bounds.Mins.x ) );
+            Assert.False( float.IsInfinity( bounds.Mins.y ) );
+            Assert.False( float.IsInfinity( bounds.Mins.z ) );
+
+            Assert.False( float.IsInfinity( bounds.Maxs.x ) );
+            Assert.False( float.IsInfinity( bounds.Maxs.y ) );
+            Assert.False( float.IsInfinity( bounds.Maxs.z ) );
+
             bounds.Mins -= CsgHelpers.DistanceEpsilon;
             bounds.Maxs += CsgHelpers.DistanceEpsilon;
 

@@ -13,7 +13,11 @@ namespace Sandbox.Csg
 
         public void InvalidateCollision()
         {
-            if ( GridCell != null ) GridCell.CollisionInvalid = true;
+            if ( GridCell != null )
+            {
+                GridCell.CollisionInvalid = true;
+                GridCell.ConnectivityInvalid = true;
+            }
 
             _vertexPropertiesInvalid = true;
 
@@ -24,7 +28,7 @@ namespace Sandbox.Csg
         {
             if ( Collider.IsValid() && Collider.Body.IsValid() )
             {
-                Collider?.Remove();
+                Collider.Remove();
             }
 
             Collider = null;

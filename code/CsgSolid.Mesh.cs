@@ -19,6 +19,11 @@ namespace Sandbox.Csg
 
         private void CollisionUpdate()
         {
+            if ( _grid.Count == 0 ) return;
+
+            var newBody = _firstCollisionUpdate;
+            _firstCollisionUpdate = false;
+
             if ( !PhysicsBody.IsValid() )
             {
                 if ( LogTimings )
@@ -30,13 +35,11 @@ namespace Sandbox.Csg
 
                 Assert.True( PhysicsBody.IsValid() );
 
-                _firstCollisionUpdate = true;
+                newBody = true;
             }
 
-            if ( _firstCollisionUpdate )
+            if ( newBody )
             {
-                _firstCollisionUpdate = false;
-
                 PhysicsBody.ClearShapes();
             }
 
@@ -53,7 +56,7 @@ namespace Sandbox.Csg
 
             foreach ( var (_, cell) in _grid )
             {
-                if ( !cell.CollisionInvalid && (cell.Hulls.Count == 0 || cell.Hulls[0].Collider.IsValid()) )
+                if ( !newBody && !cell.CollisionInvalid && (cell.Hulls.Count == 0 || cell.Hulls[0].Collider.IsValid()) )
                 {
                     totalVolume += cell.Volume;
                     totalMass += cell.Mass;
@@ -69,6 +72,11 @@ namespace Sandbox.Csg
 
                 foreach ( var hull in cell.Hulls )
                 {
+                    if ( newBody )
+                    {
+                        hull.RemoveCollider();
+                    }
+
                     if ( hull.UpdateCollider( body ) )
                     {
                         changedColliders++;
@@ -101,6 +109,8 @@ namespace Sandbox.Csg
 
         private void MeshUpdate()
         {
+            if ( _grid.Count == 0 ) return;
+
             Timer.Restart();
 
             var changed = false;
@@ -109,7 +119,11 @@ namespace Sandbox.Csg
             {
                 if ( !cell.MeshInvalid && cell.SceneObject.IsValid() == cell.Hulls.Count > 0 )
                 {
-                    cell.SceneObject.Transform = Transform;
+                    if ( cell.Hulls.Count > 0 )
+                    {
+                        cell.SceneObject.Transform = Transform;
+                    }
+
                     continue;
                 }
 

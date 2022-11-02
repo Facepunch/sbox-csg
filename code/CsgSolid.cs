@@ -129,6 +129,7 @@ namespace Sandbox.Csg
             cell.Hulls.Add( hull );
             cell.CollisionInvalid = true;
             cell.MeshInvalid = true;
+            hull.GridCell.ConnectivityInvalid = true;
         }
 
         private void RemoveHull( CsgHull hull )
@@ -144,6 +145,7 @@ namespace Sandbox.Csg
 
             hull.GridCell.CollisionInvalid = true;
             hull.GridCell.MeshInvalid = true;
+            hull.GridCell.ConnectivityInvalid = true;
 
             hull.GridCell = null;
             hull.GridCoord = default;
