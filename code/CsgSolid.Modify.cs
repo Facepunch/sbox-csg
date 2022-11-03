@@ -119,6 +119,16 @@ namespace Sandbox.Csg
 
         private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
         {
+            if ( Deleted )
+            {
+                if ( IsServer )
+                {
+                    Log.Warning( $"Attempting to modify a deleted {nameof(CsgSolid)}" );
+                }
+
+                return false;
+            }
+
             Timer.Restart();
 
             var hulls = CsgHelpers.RentHullList();

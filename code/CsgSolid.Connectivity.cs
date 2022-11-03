@@ -18,7 +18,11 @@ namespace Sandbox.Csg
                 {
                     if ( subFace.Neighbor == null ) continue;
 
-                    Assert.NotNull( subFace.Neighbor.GridCell );
+                    if ( subFace.Neighbor.GridCell == null )
+                    {
+                        Log.Warning( $"Null grid cell: {subFace.Neighbor.VertexAverage}" );
+                        continue;
+                    }
 
                     if ( subFace.Neighbor.GridCell != GridCell )
                     {
@@ -256,6 +260,8 @@ namespace Sandbox.Csg
         [ThreadStatic]
         private static List<(CsgIsland Root, int Count, float Volume)> _sChunks;
 
+        public bool Deleted { get; private set; }
+
         private bool ConnectivityUpdate()
         {
             if ( !UpdateIslands() ) return false;
@@ -312,17 +318,22 @@ namespace Sandbox.Csg
 
             chunks.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
 
-            Log.Info( $"Chunks: {chunks.Count}" );
-
-            foreach ( var chunk in chunks )
+            if ( LogTimings )
             {
-                Log.Info( $"  {chunk.Volume}, {chunk.Count}" );
+                Log.Info( $"Chunks: {chunks.Count}" );
+
+                foreach ( var chunk in chunks )
+                {
+                    Log.Info( $"  {chunk.Volume}, {chunk.Count}" );
+                }
             }
 
             // Handle the whole solid being too small / empty
 
             if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
             {
+                Deleted = true;
+
                 if ( IsClientOnly || IsServer )
                 {
                     Delete();
@@ -332,6 +343,8 @@ namespace Sandbox.Csg
                     EnableDrawing = false;
                     PhysicsEnabled = false;
                     EnableSolidCollisions = false;
+
+                    DeleteSceneObjects();
                 }
 
                 return true;

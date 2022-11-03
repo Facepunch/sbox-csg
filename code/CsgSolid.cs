@@ -40,7 +40,10 @@ namespace Sandbox.Csg
             {
                 _connectivityInvalid = false;
 
-                Disconnect();
+                if ( Disconnect() && Deleted )
+                {
+                    return;
+                }
             }
 
             CollisionUpdate();
@@ -54,8 +57,26 @@ namespace Sandbox.Csg
                 CheckInitialGeometry();
             }
 
+            if ( Deleted ) return;
+
             MeshUpdate();
             CollisionUpdate();
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+
+            DeleteSceneObjects();
+        }
+
+        private void DeleteSceneObjects()
+        {
+            foreach ( var (_, cell) in _grid )
+            {
+                cell.SceneObject?.Delete();
+                cell.SceneObject = null;
+            }
         }
 
         private void Clear( bool removeColliders )

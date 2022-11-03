@@ -54,7 +54,10 @@ namespace Sandbox.Csg
                 throw new Exception( "Containers already set up" );
             }
 
-            Log.Info( $"{Host.Name} SetupContainers( {gridSize} )" );
+            if ( LogTimings )
+            {
+                Log.Info( $"{Host.Name} SetupContainers( {gridSize} )" );
+            }
 
             if ( gridSize.x < 0f || gridSize.y < 0f || gridSize.z < 0f )
             {
