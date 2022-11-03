@@ -133,6 +133,38 @@ namespace Sandbox.Csg
             return count;
         }
 
+        public int GetHullsTouching( CsgHull hull, List<CsgHull> outHulls )
+        {
+            // First pass: cheap BBox test
+
+            var count = GetHullsTouching( hull.VertexBounds, outHulls );
+
+            Assert.AreEqual( count, outHulls.Count );
+
+            // Second pass: actual intersection check
+
+            for ( var i = count - 1; i >= 0; i-- )
+            {
+                if ( hull.IsTouching( outHulls[i] ) )
+                {
+                    continue;
+                }
+
+                count--;
+
+                (outHulls[count], outHulls[i]) = (outHulls[i], outHulls[count]);
+            }
+
+            if ( LogTimings )
+            {
+                Log.Info( $"Before: {outHulls.Count}, after: {count}" );
+            }
+
+            outHulls.RemoveRange( count, outHulls.Count - count );
+
+            return count;
+        }
+
         private int GetHullsTouching( BBox bounds, List<CsgHull> outHulls )
         {
             Assert.False( bounds.Mins.IsNaN );

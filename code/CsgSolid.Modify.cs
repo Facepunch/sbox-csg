@@ -178,7 +178,6 @@ namespace Sandbox.Csg
             if ( solid.IsEmpty ) return false;
 
             var faces = solid.Faces;
-            var bounds = solid.VertexBounds;
 
             var nearbyHulls = CsgHelpers.RentHullList();
             var addedHulls = CsgHelpers.RentHullList();
@@ -188,7 +187,7 @@ namespace Sandbox.Csg
 
             try
             {
-                GetHullsTouching( bounds, nearbyHulls );
+                GetHullsTouching( solid, nearbyHulls );
 
                 foreach ( var next in nearbyHulls )
                 {

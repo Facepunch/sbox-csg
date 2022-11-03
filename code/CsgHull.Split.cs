@@ -221,9 +221,8 @@ namespace Sandbox.Csg
             }
 
             _faces.Clear();
-            IsEmpty = true;
 
-            UpdateVertexProperties();
+            IsEmpty = true;
 
             InvalidateCollision();
             InvalidateMesh();

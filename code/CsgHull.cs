@@ -6,6 +6,7 @@ namespace Sandbox.Csg
     public partial class CsgHull
     {
         private readonly List<Face> _faces = new List<Face>();
+        private readonly List<Vector3> _vertices = new List<Vector3>();
 
         public static int NextIndex { get; set; }
 
@@ -83,6 +84,41 @@ namespace Sandbox.Csg
             return copy;
         }
 
+        private static bool HasSeparatingFace( List<Face> faces, List<Vector3> verts )
+        {
+            foreach ( var face in faces )
+            {
+                var anyPositive = false;
+
+                foreach ( var vertex in verts )
+                {
+                    if ( face.Plane.GetSign( vertex ) >= 0 )
+                    {
+                        anyPositive = true;
+                        break;
+                    }
+                }
+
+                if ( !anyPositive ) return true;
+            }
+
+            return false;
+        }
+
+        public bool IsTouching( CsgHull other )
+        {
+            other.UpdateVertexProperties();
+
+            if ( HasSeparatingFace( _faces, other._vertices ) )
+            {
+                return false;
+            }
+
+            UpdateVertexProperties();
+
+            return !HasSeparatingFace( other._faces, _vertices );
+        }
+
         public int GetSign( Vector3 pos )
         {
             if ( IsEmpty ) return -1;
@@ -119,6 +155,7 @@ namespace Sandbox.Csg
             if ( !_vertexPropertiesInvalid ) return;
 
             _vertexPropertiesInvalid = false;
+            _vertices.Clear();
 
             if ( IsEmpty )
             {
@@ -150,16 +187,14 @@ namespace Sandbox.Csg
                     }
 
                     var a = basis.GetPoint( cut, cut.Min );
-                    var b = basis.GetPoint( cut, cut.Max );
 
                     min = Vector3.Min( min, a );
                     max = Vector3.Max( max, a );
 
-                    min = Vector3.Min( min, b );
-                    max = Vector3.Max( max, b );
+                    avgPos += a;
+                    posCount += 1;
 
-                    avgPos += a + b;
-                    posCount += 2;
+                    _vertices.Add( a );
                 }
             }
 
