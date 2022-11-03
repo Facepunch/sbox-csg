@@ -194,7 +194,23 @@ namespace Sandbox.Csg
                     avgPos += a;
                     posCount += 1;
 
-                    _vertices.Add( a );
+                    var shouldAdd = true;
+
+                    // This might be too expensive
+
+                    foreach ( var vertex in _vertices )
+                    {
+                        if ( (vertex - a).IsNearlyZero( CsgHelpers.DistanceEpsilon * 0.5f ) )
+                        {
+                            shouldAdd = false;
+                            break;
+                        }
+                    }
+
+                    if ( shouldAdd )
+                    {
+                        _vertices.Add( a );
+                    }
                 }
             }
 

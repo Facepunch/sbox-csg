@@ -5,7 +5,8 @@ namespace Sandbox.Csg
 {
     public partial class CsgSolid : ModelEntity
     {
-        public const bool LogTimings = true;
+        [ConVar.Server("csg_log", Help = "If set, CSG timing info is logged")]
+        public static bool LogTimings { get; set; }
 
         public CsgSolid()
         {

@@ -187,7 +187,14 @@ namespace Sandbox.Csg
 
             try
             {
+                var elapsedBefore = Timer.Elapsed;
+
                 GetHullsTouching( solid, nearbyHulls );
+
+                if ( LogTimings )
+                {
+                    Log.Info( $"{Host.Name} GetHullsTouching: {(Timer.Elapsed - elapsedBefore).TotalMilliseconds:F2}ms" );
+                }
 
                 foreach ( var next in nearbyHulls )
                 {
