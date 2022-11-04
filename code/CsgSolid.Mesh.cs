@@ -15,6 +15,8 @@ namespace Sandbox.Csg
         private bool _firstCollisionUpdate = true;
 
         public float Volume { get; private set; }
+
+        [Net]
         public bool IsStatic { get; set; } = true;
 
         private bool CollisionUpdate()
