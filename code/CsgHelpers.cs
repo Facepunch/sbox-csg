@@ -38,6 +38,22 @@ namespace Sandbox.Csg
             return list;
         }
 
+        public static bool Equals( Vector3 a, Vector3 b )
+        {
+            // ReSharper disable CompareOfFloatsByEqualityOperator
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+            // ReSharper enable CompareOfFloatsByEqualityOperator
+        }
+
+        public static void AssertAreEqual<T>( T a, T b, string message = null )
+            where T : struct, IEquatable<T>
+        {
+            if ( !a.Equals( b ) )
+            {
+                throw new Exception( "Assert: AreEqual " + message );
+            }
+        }
+
         private static void ReturnContainer<T>( List<T> pool, T list )
         {
             if ( pool.Count >= PoolCapacity ) return;
@@ -49,7 +65,7 @@ namespace Sandbox.Csg
         {
             var list = RentContainer( ref _sFaceCutListPool );
 
-            Assert.AreEqual( 0, list.Count );
+            CsgHelpers.AssertAreEqual( 0, list.Count );
 
             return list;
         }
@@ -65,7 +81,7 @@ namespace Sandbox.Csg
         {
             var list = RentContainer( ref _sHullListPool );
 
-            Assert.AreEqual( 0, list.Count );
+            CsgHelpers.AssertAreEqual( 0, list.Count );
 
             return list;
         }
@@ -81,7 +97,7 @@ namespace Sandbox.Csg
         {
             var list = RentContainer( ref _sHullSetPool );
 
-            Assert.AreEqual( 0, list.Count );
+            CsgHelpers.AssertAreEqual( 0, list.Count );
 
             return list;
         }

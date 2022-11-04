@@ -13,6 +13,10 @@ namespace Sandbox.Csg
 
         public bool HasGrid { get; private set; }
 
+        private readonly HashSet<GridCell> _invalidCollision = new ();
+        private readonly HashSet<GridCell> _invalidMesh = new ();
+        private readonly HashSet<GridCell> _invalidConnectivity = new ();
+
         internal class GridCell
         {
             public List<CsgHull> Hulls { get; } = new List<CsgHull>();
@@ -22,20 +26,77 @@ namespace Sandbox.Csg
 
             public SceneObject SceneObject { get; set; }
 
-            public CsgSolid Solid { get; set; }
+            private CsgSolid _solid;
+
+            public CsgSolid Solid
+            {
+                get => _solid;
+                set
+                {
+                    if ( _solid == value ) return;
+
+                    _solid = value;
+
+                    _solid?._invalidCollision.Add( this );
+                    _solid?._invalidMesh.Add( this );
+                    _solid?._invalidConnectivity.Add( this );
+                }
+            }
 
             public float Volume { get; set; }
             public float Mass { get; set; }
 
-            public bool CollisionInvalid { get; set; }
-            public bool MeshInvalid { get; set; }
-            public bool ConnectivityInvalid { get; set; }
-            
+            public bool CollisionInvalid { get; private set; }
+            public bool MeshInvalid { get; private set; }
+            public bool ConnectivityInvalid { get; private set; }
+
+            public void InvalidateCollision()
+            {
+                if ( CollisionInvalid ) return;
+
+                CollisionInvalid = true;
+
+                Solid?._invalidCollision.Add( this );
+            }
+
+            public void PostCollisionUpdate()
+            {
+                CollisionInvalid = false;
+            }
+
+            public void InvalidateMesh()
+            {
+                if ( MeshInvalid ) return;
+
+                MeshInvalid = true;
+
+                Solid?._invalidMesh.Add( this );
+            }
+
+            public void PostMeshUpdate()
+            {
+                MeshInvalid = false;
+            }
+
+            public void InvalidateConnectivity()
+            {
+                if ( ConnectivityInvalid ) return;
+
+                ConnectivityInvalid = true;
+                
+                Solid?._invalidConnectivity.Add( this );
+            }
+
+            public void PostConnectivityUpdate()
+            {
+                ConnectivityInvalid = false;
+            }
+
             public CsgIsland GetOrCreateIsland( int index )
             {
                 if ( index < Islands.Count ) return Islands[index];
 
-                Assert.AreEqual( Islands.Count, index );
+                CsgHelpers.AssertAreEqual( Islands.Count, index );
 
                 var island = new CsgIsland();
 
@@ -139,7 +200,7 @@ namespace Sandbox.Csg
 
             var count = GetHullsTouching( hull.VertexBounds, outHulls );
 
-            Assert.AreEqual( count, outHulls.Count );
+            CsgHelpers.AssertAreEqual( count, outHulls.Count );
 
             // Second pass: actual intersection check
 

@@ -114,8 +114,8 @@ namespace Sandbox.Csg
 
                         // Negative side
 
-                        _faces.RemoveAt( i );
-                        negSolid?._faces.Add( face );
+                        RemoveFace( i );
+                        negSolid?.AddFace( face );
 
                         foreach ( var subFace in face.SubFaces )
                         {
@@ -138,8 +138,8 @@ namespace Sandbox.Csg
                             SubFaces = new List<SubFace>()
                         };
 
-                    _faces[i] = posFace;
-                    negSolid?._faces.Add( negFace.Value );
+                    UpdateFace( i, posFace );
+                    negSolid?.AddFace( negFace.Value );
 
                     foreach ( var subFace in face.SubFaces )
                     {
@@ -192,8 +192,8 @@ namespace Sandbox.Csg
                     posSplitFace.SubFaces.Add( posSubFace );
                 }
 
-                _faces.Add( posSplitFace );
-                negSolid?._faces.Add( posSplitFace.CloneFlipped( this ) );
+                AddFace( posSplitFace );
+                negSolid?.AddFace( posSplitFace.CloneFlipped( this ) );
 
                 InvalidateMesh();
                 InvalidateCollision();
@@ -222,6 +222,9 @@ namespace Sandbox.Csg
 
             _faces.Clear();
 
+            _neighborsInvalid = true;
+            _vertexPropertiesInvalid = true;
+
             IsEmpty = true;
 
             InvalidateCollision();
@@ -230,6 +233,8 @@ namespace Sandbox.Csg
 
         private bool ReplaceNeighbor( CsgPlane plane, CsgHull oldNeighbor, CsgHull newNeighbor )
         {
+            Assert.True( newNeighbor != this );
+
             if ( !TryGetFace( plane, out var face ) ) return false;
 
             var changed = false;
@@ -248,6 +253,8 @@ namespace Sandbox.Csg
 
             if ( changed )
             {
+                _neighborsInvalid = true;
+
                 InvalidateMesh();
             }
 
@@ -256,6 +263,8 @@ namespace Sandbox.Csg
 
         private bool ReplaceNeighbor( CsgPlane plane, CsgHull oldNeighbor, CsgHull newNeighbor, CsgPlane cutPlane )
         {
+            Assert.True( newNeighbor != this );
+
             if ( !TryGetFace( plane, out var face ) ) return false;
             
             var helper = plane.GetHelper();
@@ -291,6 +300,8 @@ namespace Sandbox.Csg
 
                 if ( changed )
                 {
+                    _neighborsInvalid = true;
+
                     InvalidateMesh();
                 }
 
@@ -324,6 +335,8 @@ namespace Sandbox.Csg
 
                 foreach ( var subFace in otherFace.SubFaces )
                 {
+                    Assert.True( subFace.Neighbor != this );
+
                     thisFace.SubFaces.Add( subFace.Clone() );
 
                     subFace.Neighbor?.ReplaceNeighbor( -thisFace.Plane, other, this );
@@ -334,6 +347,8 @@ namespace Sandbox.Csg
 
             if ( changed )
             {
+                _neighborsInvalid = true;
+
                 InvalidateMesh();
             }
 

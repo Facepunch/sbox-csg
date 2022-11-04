@@ -11,13 +11,8 @@ namespace Sandbox.Csg
 
         public void InvalidateCollision()
         {
-            if ( GridCell != null )
-            {
-                GridCell.CollisionInvalid = true;
-                GridCell.ConnectivityInvalid = true;
-            }
-
-            _vertexPropertiesInvalid = true;
+            GridCell?.InvalidateCollision();
+            GridCell?.InvalidateConnectivity();
 
             RemoveCollider();
         }
@@ -39,7 +34,7 @@ namespace Sandbox.Csg
 
             RemoveCollider();
 
-            UpdateVertexProperties();
+            UpdateVertices();
 
             Assert.True( _vertices.Count > 3 );
 

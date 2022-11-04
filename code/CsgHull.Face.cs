@@ -185,6 +185,13 @@ namespace Sandbox.Csg
                 return Normal.Equals(other.Normal) && Distance.Equals(other.Distance);
             }
 
+            public bool ApproxEquals( FaceCut other )
+            {
+                return
+                    Math.Abs( 1f - CsgHelpers.Dot( Normal, other.Normal ) ) < CsgHelpers.UnitEpsilon &&
+                    Math.Abs( Distance - other.Distance ) <= CsgHelpers.DistanceEpsilon;
+            }
+
             public override bool Equals( object obj )
             {
                 return obj is FaceCut other && Equals(other);

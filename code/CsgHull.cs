@@ -5,8 +5,9 @@ namespace Sandbox.Csg
 {
     public partial class CsgHull
     {
-        private readonly List<Face> _faces = new List<Face>();
-        private readonly List<Vector3> _vertices = new List<Vector3>();
+        private readonly List<Face> _faces = new ();
+        private readonly List<Vector3> _vertices = new ();
+        private readonly Dictionary<CsgHull, CsgPlane> _neighbors = new ();
 
         public static int NextIndex { get; set; }
 
@@ -23,6 +24,7 @@ namespace Sandbox.Csg
         public IReadOnlyList<Face> Faces => _faces;
 
         private bool _vertexPropertiesInvalid = true;
+        private bool _neighborsInvalid = true;
 
         private Vector3 _vertexAverage;
         private BBox _vertexBBox;
@@ -32,7 +34,7 @@ namespace Sandbox.Csg
         {
             get
             {
-                UpdateVertexProperties();
+                UpdateVertices();
                 return _vertexAverage;
             }
         }
@@ -41,7 +43,7 @@ namespace Sandbox.Csg
         {
             get
             {
-                UpdateVertexProperties();
+                UpdateVertices();
                 return _vertexBBox;
             }
         }
@@ -50,7 +52,7 @@ namespace Sandbox.Csg
         {
             get
             {
-                UpdateVertexProperties();
+                UpdateVertices();
                 return _volume;
             }
         }
@@ -62,7 +64,7 @@ namespace Sandbox.Csg
 
         public void InvalidateMesh()
         {
-            if ( GridCell != null ) GridCell.MeshInvalid = true;
+            GridCell?.InvalidateMesh();
         }
         
         public CsgHull Clone()
@@ -75,7 +77,7 @@ namespace Sandbox.Csg
 
             foreach ( var face in _faces )
             {
-                copy._faces.Add( face.Clone() );
+                copy.AddFace( face.Clone() );
             }
 
             copy.InvalidateMesh();
@@ -107,16 +109,177 @@ namespace Sandbox.Csg
 
         public bool IsTouching( CsgHull other )
         {
-            other.UpdateVertexProperties();
+            other.UpdateVertices();
 
             if ( HasSeparatingFace( _faces, other._vertices ) )
             {
                 return false;
             }
 
-            UpdateVertexProperties();
+            UpdateVertices();
 
             return !HasSeparatingFace( other._faces, _vertices );
+        }
+
+        public int GetNeighbors( List<CsgHull> outNeighbors )
+        {
+            UpdateNeighbors();
+
+            outNeighbors.AddRange( _neighbors.Keys );
+
+            return _neighbors.Count;
+        }
+
+        public bool TryMerge( CsgHull other )
+        {
+            Assert.False( this == other );
+            Assert.NotNull( GridCell );
+
+            // We can merge if:
+            // * The two hulls are touching on a plane
+            // * They have the same material
+            // * They're in the same grid cell
+            // * All sub-faces on the touching plane are neighbors of each other
+            // * When ignoring the touching plane, all vertices are within the
+            //     union of both plane lists
+
+            if ( other.Material != Material ) return false;
+            if ( other.GridCell != GridCell ) return false;
+
+            UpdateNeighbors();
+
+            if ( !_neighbors.TryGetValue( other, out var plane ) )
+            {
+                return false;
+            }
+
+            Assert.True( TryGetFace( plane, out var thisFace ) );
+            Assert.True( other.TryGetFace( -thisFace.Plane, out var otherFace ) );
+
+            // Make sure all sub faces are neighbors of each other
+
+            foreach ( var subFace in thisFace.SubFaces )
+            {
+                if ( subFace.Neighbor != other )
+                {
+                    return false;
+                }
+            }
+
+            foreach ( var subFace in otherFace.SubFaces )
+            {
+                if ( subFace.Neighbor != this )
+                {
+                    return false;
+                }
+            }
+
+            // Make sure no vertices in the other hull are excluded by
+            // this hull's faces (excluding shared plane)
+
+            other.UpdateVertices();
+
+            foreach ( var face in _faces )
+            {
+                if ( face.Plane.Equals( thisFace.Plane ) ) continue;
+
+                foreach ( var vertex in other._vertices )
+                {
+                    if ( face.Plane.GetSign( vertex ) < 0 )
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            // And the reverse
+
+            foreach ( var face in other._faces )
+            {
+                if ( face.Plane.Equals( otherFace.Plane ) ) continue;
+
+                foreach ( var vertex in _vertices )
+                {
+                    if ( face.Plane.GetSign( vertex ) < 0 )
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            // It's safe to merge!
+
+            RemoveFace( thisFace );
+            other.RemoveFace( otherFace );
+
+            foreach ( var face in other._faces )
+            {
+                if ( !TryGetFace( face.Plane, out var adjacentFace ) )
+                {
+                    foreach ( var subFace in face.SubFaces )
+                    {
+                        Assert.True( subFace.Neighbor != this );
+                    }
+
+                    AddFace( face.Clone() );
+                    continue;
+                }
+
+                // Face is coplanar and adjacent to one already in this hull
+
+                var hasFoundDividingCut = false;
+
+                foreach ( var otherCut in face.FaceCuts )
+                {
+                    var canAdd = true;
+
+                    for ( var i = 0; i < adjacentFace.FaceCuts.Count; i++ )
+                    {
+                        var thisCut = adjacentFace.FaceCuts[i];
+
+                        if ( thisCut.ApproxEquals( otherCut ) )
+                        {
+                            thisCut.Min = Math.Min( thisCut.Min, otherCut.Min );
+                            thisCut.Max = Math.Max( thisCut.Max, otherCut.Max );
+
+                            adjacentFace.FaceCuts[i] = thisCut;
+                            canAdd = false;
+
+                            break;
+                        }
+
+                        if ( thisCut.ApproxEquals( -otherCut ) )
+                        {
+                            adjacentFace.FaceCuts.RemoveAt( i );
+
+                            canAdd = false;
+                            hasFoundDividingCut = true;
+
+                            break;
+                        }
+                    }
+
+                    if ( canAdd )
+                    {
+                        adjacentFace.FaceCuts.Add( otherCut );
+                    }
+                }
+
+                Assert.True( hasFoundDividingCut );
+
+                // Merge in sub faces
+
+                foreach ( var subFace in face.SubFaces )
+                {
+                    adjacentFace.SubFaces.Add( subFace.Clone() );
+                }
+
+                _neighborsInvalid = true;
+            }
+
+            other.SetEmpty( this );
+
+            return true;
         }
 
         public int GetSign( Vector3 pos )
@@ -150,7 +313,70 @@ namespace Sandbox.Csg
             return false;
         }
 
-        private void UpdateVertexProperties()
+        private void AddFace( Face face )
+        {
+            _faces.Add( face );
+
+            _vertexPropertiesInvalid = true;
+            _neighborsInvalid = true;
+        }
+
+        private void RemoveFace( int index )
+        {
+            _faces.RemoveAt( index );
+
+            _vertexPropertiesInvalid = true;
+            _neighborsInvalid = true;
+        }
+
+        private void RemoveFace( Face face )
+        {
+            Assert.True( _faces.Remove( face ) );
+
+            _vertexPropertiesInvalid = true;
+            _neighborsInvalid = true;
+        }
+
+        private void UpdateFace( int index, Face face )
+        {
+            _faces[index] = face;
+
+            _vertexPropertiesInvalid = true;
+            _neighborsInvalid = true;
+        }
+
+        private void UpdateNeighbors()
+        {
+            if ( !_neighborsInvalid ) return;
+
+            _neighborsInvalid = false;
+
+            _neighbors.Clear();
+
+            foreach ( var face in _faces )
+            {
+                foreach ( var subFace in face.SubFaces )
+                {
+                    if ( subFace.Neighbor == null )
+                    {
+                        continue;
+                    }
+
+                    Assert.True( subFace.Neighbor != this );
+
+                    if ( _neighbors.TryGetValue( subFace.Neighbor, out var existingPlane ) )
+                    {
+                        CsgHelpers.AssertAreEqual( face.Plane, existingPlane );
+                    }
+                    else
+                    {
+                        _neighbors.Add( subFace.Neighbor, face.Plane );
+                    }
+                }
+            }
+        }
+
+        private void UpdateVertices()
         {
             if ( !_vertexPropertiesInvalid ) return;
 

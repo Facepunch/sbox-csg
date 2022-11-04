@@ -17,7 +17,6 @@ namespace Sandbox.Csg
         private record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
 
         private int _appliedModifications;
-        private bool _connectivityInvalid;
 
         [Net, Change, HideInEditor]
         private IList<Modification> Modifications { get; set; }
@@ -155,11 +154,6 @@ namespace Sandbox.Csg
                     changed |= Modify( solid, modification.Operator );
                 }
 
-                if ( changed && modification.Operator is CsgOperator.Add or CsgOperator.Subtract )
-                {
-                    _connectivityInvalid = true;
-                }
-
                 return changed;
             }
             finally
@@ -182,6 +176,7 @@ namespace Sandbox.Csg
             var nearbyHulls = CsgHelpers.RentHullList();
             var addedHulls = CsgHelpers.RentHullList();
             var removedHulls = CsgHelpers.RentHullList();
+            var changedHulls = CsgHelpers.RentHullSet();
 
             var changed = false;
 
@@ -199,16 +194,17 @@ namespace Sandbox.Csg
                 foreach ( var next in nearbyHulls )
                 {
                     var skip = false;
+                    var nextChanged = false;
 
                     switch ( op )
                     {
                         case CsgOperator.Replace:
-                            changed |= next.Paint( solid, null );
+                            changed |= nextChanged = next.Paint( solid, null );
                             skip = next.Material == solid.Material;
                             break;
 
                         case CsgOperator.Paint:
-                            changed |= next.Paint( solid, solid.Material );
+                            changed |= nextChanged = next.Paint( solid, solid.Material );
                             skip = true;
                             break;
 
@@ -223,13 +219,25 @@ namespace Sandbox.Csg
                                 }
 
                                 skip = true;
-                                changed |= ConnectFaces( solidFace, solid, nextFace, next );
+
+                                if ( ConnectFaces( solidFace, solid, nextFace, next ) )
+                                {
+                                    changed = nextChanged = true;
+                                }
                                 break;
                             }
                             break;
                     }
 
-                    if ( skip ) continue;
+                    if ( skip )
+                    {
+                        if ( nextChanged )
+                        {
+                            changedHulls.Add( next );
+                        }
+
+                        continue;
+                    }
 
                     for ( var faceIndex = 0; faceIndex < faces.Count && !next.IsEmpty; ++faceIndex )
                     {
@@ -241,7 +249,7 @@ namespace Sandbox.Csg
                             continue;
                         }
 
-                        changed = true;
+                        changed = nextChanged = true;
 
                         if ( child.Faces.Count < 4 )
                         {
@@ -250,6 +258,7 @@ namespace Sandbox.Csg
                         else if ( !child.IsEmpty )
                         {
                             addedHulls.Add( child );
+                            changedHulls.Add( child );
                         }
 
                         if ( next.Faces.Count < 4 )
@@ -266,7 +275,15 @@ namespace Sandbox.Csg
                         continue;
                     }
 
-                    if ( solid.GetSign( next.VertexAverage ) < 0 ) continue;
+                    if ( solid.GetSign( next.VertexAverage ) < 0 )
+                    {
+                        if ( nextChanged )
+                        {
+                            changedHulls.Add( next );
+                        }
+
+                        continue;
+                    }
 
                     // next will now contain only the intersection with solid.
                     // We'll copy its faces and remove it
@@ -278,6 +295,8 @@ namespace Sandbox.Csg
 
                             next.Material = solid.Material;
                             next.InvalidateMesh();
+
+                            changedHulls.Add( next );
                             break;
 
                         case CsgOperator.Add:
@@ -305,7 +324,9 @@ namespace Sandbox.Csg
                         changed = true;
 
                         solid.RemoveCollider();
+
                         addedHulls.Add( solid );
+                        changedHulls.Add( solid );
                         break;
                 }
 
@@ -318,12 +339,58 @@ namespace Sandbox.Csg
                 {
                     AddHull( hull );
                 }
+
+                if ( op != CsgOperator.Paint )
+                {
+                    // Try to merge adjacent hulls
+
+                    var mergeCount = 0;
+
+                    var elapsed = Timer.Elapsed;
+
+                    foreach ( var hull in changedHulls )
+                    {
+                        if ( hull.IsEmpty ) continue;
+
+                        bool merged;
+
+                        do
+                        {
+                            merged = false;
+
+                            nearbyHulls.Clear();
+
+                            hull.GetNeighbors( nearbyHulls );
+
+                            foreach ( var neighbor in nearbyHulls )
+                            {
+                                Assert.NotNull( neighbor.GridCell );
+
+                                if ( hull.TryMerge( neighbor ) )
+                                {
+                                    ++mergeCount;
+
+                                    RemoveHull( neighbor );
+
+                                    merged = true;
+                                    break;
+                                }
+                            }
+                        } while ( merged );
+                    }
+
+                    if ( mergeCount > 0 && LogTimings )
+                    {
+                        Log.Info( $"{Host.Name} Merged {mergeCount} times in {(Timer.Elapsed - elapsed).TotalMilliseconds:F2}ms" );
+                    }
+                }
             }
             finally
             {
                 CsgHelpers.Return( nearbyHulls );
                 CsgHelpers.Return( addedHulls );
                 CsgHelpers.Return( removedHulls );
+                CsgHelpers.Return( changedHulls );
             }
 
             return changed;

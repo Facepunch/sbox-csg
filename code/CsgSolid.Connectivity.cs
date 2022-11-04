@@ -12,34 +12,35 @@ namespace Sandbox.Csg
         {
             Assert.NotNull( GridCell );
 
-            foreach ( var face in _faces )
+            UpdateNeighbors();
+
+            foreach ( var (neighbor, _) in _neighbors )
             {
-                foreach ( var subFace in face.SubFaces )
+                if ( neighbor.GridCell == null )
                 {
-                    if ( subFace.Neighbor == null ) continue;
-
-                    if ( subFace.Neighbor.GridCell == null )
-                    {
-                        Log.Warning( $"Null grid cell: {subFace.Neighbor.VertexAverage}" );
-                        continue;
-                    }
-
-                    if ( subFace.Neighbor.GridCell != GridCell )
-                    {
-                        island.NeighborHulls.Add( subFace.Neighbor );
-                        continue;
-                    }
-
-                    if ( subFace.Neighbor.Island == island ) continue;
-
-                    Assert.AreEqual( null, subFace.Neighbor.Island );
-
-                    subFace.Neighbor.Island = island;
-
-                    Assert.True( island.Hulls.Add( subFace.Neighbor ) );
-
-                    queue.Enqueue( subFace.Neighbor );
+                    Log.Warning( $"Null grid cell: {neighbor.VertexAverage}" );
+                    continue;
                 }
+
+                if ( neighbor.GridCell != GridCell )
+                {
+                    island.NeighborHulls.Add( neighbor );
+                    continue;
+                }
+
+                if ( neighbor.Island == island ) continue;
+
+                Assert.AreEqual( null, neighbor.Island );
+
+                neighbor.Island = island;
+
+                Assert.True( island.Hulls.Add( neighbor ) );
+
+                neighbor.UpdateNeighbors();
+
+                Assert.True( neighbor._neighbors.ContainsKey( this ) );
+
+                queue.Enqueue( neighbor );
             }
         }
     }
@@ -81,8 +82,8 @@ namespace Sandbox.Csg
         {
             Assert.AreEqual( null, root.Island );
 
-            Assert.AreEqual( 0, Hulls.Count );
-            Assert.AreEqual( 0, NeighborHulls.Count );
+            CsgHelpers.AssertAreEqual( 0, Hulls.Count );
+            CsgHelpers.AssertAreEqual( 0, NeighborHulls.Count );
 
             var queue = _sVisitQueue ??= new Queue<CsgHull>();
             queue.Clear();
@@ -130,7 +131,7 @@ namespace Sandbox.Csg
                 _copiedInitialGeometry = true;
                 _appliedModifications = 0;
 
-                Assert.AreEqual( _gridSize, clientCopy._gridSize );
+                CsgHelpers.AssertAreEqual( _gridSize, clientCopy._gridSize );
 
                 Clear( true );
 
@@ -139,9 +140,9 @@ namespace Sandbox.Csg
                     _grid.Add( pair.Key, pair.Value );
 
                     pair.Value.Solid = this;
-                    pair.Value.MeshInvalid = true;
-                    pair.Value.CollisionInvalid = true;
-                    pair.Value.ConnectivityInvalid = true;
+                    pair.Value.InvalidateMesh();
+                    pair.Value.InvalidateCollision();
+                    pair.Value.InvalidateConnectivity();
 
                     foreach ( var hull in pair.Value.Hulls )
                     {
@@ -158,15 +159,11 @@ namespace Sandbox.Csg
 
         private bool UpdateIslands()
         {
-            var changed = false;
+            if ( _invalidConnectivity.Count == 0 ) return false;
 
-            foreach ( var (_, cell) in _grid )
+            foreach ( var cell in _invalidConnectivity )
             {
-                if ( !cell.ConnectivityInvalid ) continue;
-
-                // Don't unset ConnectivityInvalid yet, we'll do that later
-
-                changed = true;
+                if ( cell.Solid != this ) continue;
 
                 // Clear existing islands for re-use
 
@@ -200,7 +197,7 @@ namespace Sandbox.Csg
 
                         remaining.ExceptWith( island.Hulls );
 
-                        Assert.AreEqual( oldCount - island.Hulls.Count, remaining.Count );
+                        CsgHelpers.AssertAreEqual( oldCount - island.Hulls.Count, remaining.Count );
                     }
                 }
                 finally
@@ -223,15 +220,11 @@ namespace Sandbox.Csg
                 cell.Islands.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
             }
 
-            if ( !changed ) return false;
-
             // Update neighbors for changed islands
 
-            foreach ( var (_, cell) in _grid )
+            foreach ( var cell in _invalidConnectivity )
             {
-                if ( !cell.ConnectivityInvalid ) continue;
-
-                cell.ConnectivityInvalid = false;
+                if ( cell.Solid != this ) continue;
 
                 foreach ( var island in cell.Islands )
                 {
@@ -248,7 +241,11 @@ namespace Sandbox.Csg
 
                     island.NeighborHulls.Clear();
                 }
+
+                cell.PostConnectivityUpdate();
             }
+
+            _invalidConnectivity.Clear();
 
             return true;
         }

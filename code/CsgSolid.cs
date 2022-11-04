@@ -37,10 +37,8 @@ namespace Sandbox.Csg
         [Event.Tick.Server]
         private void ServerTick()
         {
-            if ( _connectivityInvalid )
+            if ( _invalidConnectivity.Count > 0 )
             {
-                _connectivityInvalid = false;
-
                 if ( Disconnect() && Deleted )
                 {
                     return;
@@ -161,9 +159,10 @@ namespace Sandbox.Csg
             hull.Island = null;
 
             cell.Hulls.Add( hull );
-            cell.CollisionInvalid = true;
-            cell.MeshInvalid = true;
-            hull.GridCell.ConnectivityInvalid = true;
+
+            cell.InvalidateCollision();
+            cell.InvalidateMesh();
+            cell.InvalidateConnectivity();
         }
 
         private void RemoveHull( CsgHull hull )
@@ -173,17 +172,19 @@ namespace Sandbox.Csg
                 throw new Exception( "Hull isn't owned by this solid" );
             }
 
-            Assert.True( hull.GridCell.Hulls.Remove( hull ) );
+            var cell = hull.GridCell;
+
+            Assert.True( cell.Hulls.Remove( hull ) );
 
             hull.RemoveCollider();
-
-            hull.GridCell.CollisionInvalid = true;
-            hull.GridCell.MeshInvalid = true;
-            hull.GridCell.ConnectivityInvalid = true;
 
             hull.GridCell = null;
             hull.GridCoord = default;
             hull.Island = null;
+
+            cell.InvalidateCollision();
+            cell.InvalidateMesh();
+            cell.InvalidateConnectivity();
         }
     }
 }

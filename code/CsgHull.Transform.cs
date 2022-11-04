@@ -5,9 +5,6 @@ namespace Sandbox.Csg
     {
         public void Transform( in Matrix matrix )
         {
-            InvalidateMesh();
-            InvalidateCollision();
-
             for ( var i = 0; i < _faces.Count; ++i )
             {
                 var face = _faces[i];
@@ -33,6 +30,11 @@ namespace Sandbox.Csg
 
                 _faces[i] = face;
             }
+
+            _vertexPropertiesInvalid = true;
+
+            InvalidateMesh();
+            InvalidateCollision();
         }
     }
 }

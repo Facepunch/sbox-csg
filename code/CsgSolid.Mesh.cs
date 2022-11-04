@@ -17,9 +17,9 @@ namespace Sandbox.Csg
         public float Volume { get; private set; }
         public bool IsStatic { get; set; } = true;
 
-        private void CollisionUpdate()
+        private bool CollisionUpdate()
         {
-            if ( _grid.Count == 0 ) return;
+            if ( _grid.Count == 0 ) return false;
 
             var newBody = _firstCollisionUpdate;
             _firstCollisionUpdate = false;
@@ -41,31 +41,27 @@ namespace Sandbox.Csg
             if ( newBody )
             {
                 PhysicsBody.ClearShapes();
+
+                foreach ( var (_, cell) in _grid )
+                {
+                    cell.InvalidateCollision();
+                }
+            }
+
+            if ( _invalidCollision.Count == 0 )
+            {
+                return false;
             }
 
             Timer.Restart();
 
-            var changed = false;
-
             var body = PhysicsBody;
-
-            var totalVolume = 0f;
-            var totalMass = 0f;
 
             var changedColliders = 0;
 
-            foreach ( var (_, cell) in _grid )
+            foreach ( var cell in _invalidCollision )
             {
-                if ( !newBody && !cell.CollisionInvalid && (cell.Hulls.Count == 0 || cell.Hulls[0].Collider.IsValid()) )
-                {
-                    totalVolume += cell.Volume;
-                    totalMass += cell.Mass;
-                    continue;
-                }
-
-                cell.CollisionInvalid = false;
-
-                changed = true;
+                if ( cell.Solid != this ) continue;
 
                 var mass = 0f;
                 var volume = 0f;
@@ -86,11 +82,22 @@ namespace Sandbox.Csg
                     volume += hull.Volume;
                 }
 
-                totalMass += cell.Mass = mass;
-                totalVolume += cell.Volume = volume;
+                cell.Mass = mass;
+                cell.Volume = volume;
+
+                cell.PostCollisionUpdate();
             }
 
-            if ( !changed ) return;
+            _invalidCollision.Clear();
+
+            var totalVolume = 0f;
+            var totalMass = 0f;
+
+            foreach ( var (_, cell) in _grid )
+            {
+                totalMass += cell.Mass;
+                totalVolume += cell.Volume;
+            }
 
             Volume = totalVolume;
 
@@ -105,35 +112,34 @@ namespace Sandbox.Csg
             {
                 Log.Info( $"{Host.Name} Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {changedColliders} of {PhysicsBody.Shapes.Count()}" );
             }
+
+            return true;
         }
 
-        private void MeshUpdate()
+        private bool MeshUpdate()
         {
-            if ( _grid.Count == 0 ) return;
+            if ( !IsStatic )
+            {
+                foreach ( var (_, cell) in _grid )
+                {
+                    if ( !cell.SceneObject.IsValid() ) continue;
+
+                    cell.SceneObject.Transform = Transform;
+                }
+            }
+
+            if ( _grid.Count == 0 || _invalidMesh.Count == 0 ) return false;
 
             Timer.Restart();
 
-            var changed = false;
-
-            foreach ( var (_, cell) in _grid )
+            foreach ( var cell in _invalidMesh )
             {
-                if ( !cell.MeshInvalid && cell.SceneObject.IsValid() == cell.Hulls.Count > 0 )
-                {
-                    if ( cell.Hulls.Count > 0 )
-                    {
-                        cell.SceneObject.Transform = Transform;
-                    }
-
-                    continue;
-                }
-
-                changed = true;
-
-                cell.MeshInvalid = false;
+                if ( cell.Solid != this ) continue;
 
                 if ( cell.Hulls.Count == 0 )
                 {
                     cell.SceneObject?.Delete();
+                    cell.PostMeshUpdate();
                     continue;
                 }
 
@@ -149,18 +155,24 @@ namespace Sandbox.Csg
                     var model = modelBuilder.Create();
 
                     cell.SceneObject?.Delete();
-                    cell.SceneObject = new SceneObject( Scene, model );
+                    cell.SceneObject = new SceneObject( Scene, model, Transform );
+                }
+                else
+                {
+                    cell.SceneObject.Transform = Transform;
                 }
 
-                cell.SceneObject.Transform = Transform;
+                cell.PostMeshUpdate();
             }
 
-            if ( !changed ) return;
+            _invalidMesh.Clear();
 
             if ( LogTimings )
             {
                 Log.Info( $"{Host.Name} Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
             }
+
+            return true;
         }
 
         [ThreadStatic]

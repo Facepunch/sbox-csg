@@ -59,7 +59,7 @@ namespace Sandbox.Csg
 
         public bool Equals( CsgPlane other )
         {
-            return Normal.Equals(other.Normal) && Distance.Equals(other.Distance);
+            return CsgHelpers.Equals( Normal, other.Normal ) && Distance.Equals( other.Distance );
         }
 
         public bool ApproxEquals( CsgPlane other )
