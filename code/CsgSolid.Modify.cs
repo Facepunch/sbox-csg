@@ -12,14 +12,106 @@ namespace Sandbox.Csg
         Disconnect
     }
 
+    internal record struct CsgModification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
+    
     partial class CsgSolid
     {
-        private record struct Modification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
+        private const int MaxModificationsPerMessage = 8;
+        private const int SendModificationsRpc = 269924031; // CsgSolid.SendModifications
 
         private int _appliedModifications;
+        private readonly List<CsgModification> _modifications = new List<CsgModification>();
+        private readonly Dictionary<Entity, int> _sentModifications = new Dictionary<Entity, int>();
 
-        [Net, Change, HideInEditor]
-        private IList<Modification> Modifications { get; set; }
+        [ThreadStatic]
+        private static List<Entity> _sToRemove;
+
+        private void AddModification( in CsgModification modification )
+        {
+            _modifications.Add( modification );
+        }
+
+        private void SendModifications()
+        {
+            _sToRemove ??= new List<Entity>();
+            _sToRemove.Clear();
+
+            foreach ( var (pawn, _) in _sentModifications )
+            {
+                if ( !pawn.IsValid )
+                {
+                    _sToRemove.Add( pawn );
+                }
+            }
+
+            foreach ( var entity in _sToRemove )
+            {
+                _sentModifications.Remove( entity );
+            }
+
+            foreach ( var client in Client.All )
+            {
+                if ( client.IsBot ) continue;
+                if ( client.Pawn is null ) continue;
+
+                if ( !_sentModifications.TryGetValue( client.Pawn, out var prevCount ) )
+                {
+                    prevCount = 0;
+                    _sentModifications.Add( client.Pawn, prevCount );
+                }
+
+                Assert.True( prevCount <= _modifications.Count );
+
+                if ( prevCount == _modifications.Count ) continue;
+
+                var msg = NetWrite.StartRpc( SendModificationsRpc, this );
+
+                var msgCount = Math.Min( _modifications.Count - prevCount, MaxModificationsPerMessage );
+
+                msg.Write( prevCount );
+                msg.Write( msgCount );
+                msg.Write( _modifications.Count );
+
+                for ( var i = 0; i < msgCount; i++ )
+                {
+                    msg.Write( _modifications[prevCount + i] );
+                }
+
+                msg.SendRpc( To.Single( client ), null );
+
+                _sentModifications[client.Pawn] = prevCount + msgCount;
+            }
+        }
+
+        private void ReceiveModifications( NetRead read )
+        {
+            var prevCount = read.Read<int>();
+            var msgCount = read.Read<int>();
+            var totalCount = read.Read<int>();
+
+            Assert.AreEqual( prevCount, _modifications.Count );
+
+            for ( var i = 0; i < msgCount; ++i )
+            {
+                _modifications.Add( read.Read<CsgModification>() );
+            }
+
+            OnModificationsChanged();
+        }
+
+        protected override void OnCallRemoteProcedure( int id, NetRead read )
+        {
+            switch ( id )
+            {
+                case SendModificationsRpc:
+                    ReceiveModifications( read );
+                    break;
+
+                default:
+                    base.OnCallRemoteProcedure( id, read );
+                    break;
+            }
+        }
 
         private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
@@ -87,9 +179,9 @@ namespace Sandbox.Csg
                 return;
             }
 
-            while ( _appliedModifications < Modifications.Count )
+            while ( _appliedModifications < _modifications.Count )
             {
-                var next = Modifications[_appliedModifications++];
+                var next = _modifications[_appliedModifications++];
                 var brush = next.Brush == 0 ? null : ResourceLibrary.Get<CsgBrush>( next.Brush );
                 var material = next.Material == 0 ? null : ResourceLibrary.Get<CsgMaterial>( next.Material );
 
@@ -105,18 +197,18 @@ namespace Sandbox.Csg
         {
             Host.AssertServer( nameof(Modify) );
 
-            var mod = new Modification( brush?.ResourceId ?? 0, material?.ResourceId ?? 0, op, transform * WorldToLocal );
+            var mod = new CsgModification( brush?.ResourceId ?? 0, material?.ResourceId ?? 0, op, transform * WorldToLocal );
             
             if ( Modify( mod, brush, material ) )
             {
-                Modifications.Add( mod );
+                AddModification( mod );
                 return true;
             }
 
             return false;
         }
 
-        private bool Modify( in Modification modification, CsgBrush brush, CsgMaterial material )
+        private bool Modify( in CsgModification modification, CsgBrush brush, CsgMaterial material )
         {
             if ( Deleted )
             {

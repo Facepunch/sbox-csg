@@ -10,7 +10,7 @@ namespace Sandbox.Csg
 
         public CsgSolid()
         {
-
+            Host.AssertClient( nameof(CsgSolid) );
         }
 
         public CsgSolid( Vector3 gridSize )
@@ -45,6 +45,7 @@ namespace Sandbox.Csg
                 }
             }
 
+            SendModifications();
             CollisionUpdate();
         }
 
