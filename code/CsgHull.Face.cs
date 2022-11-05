@@ -175,6 +175,13 @@ namespace Sandbox.Csg
                 return Normal * Distance + new Vector2( -Normal.y, Normal.x ) * along;
             }
 
+            public int GetSign( Vector2 pos )
+            {
+                var dot = CsgHelpers.Dot( pos, Normal ) - Distance;
+
+                return dot > CsgHelpers.DistanceEpsilon ? 1 : dot < -CsgHelpers.DistanceEpsilon ? -1 : 0;
+            }
+
             public override string ToString()
             {
                 return $"{{ Normal: {Normal}, Distance: {Distance} }}";

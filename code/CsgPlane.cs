@@ -141,9 +141,7 @@ namespace Sandbox.Csg
 
             public Vector3 GetPoint( CsgHull.FaceCut cut, float along )
             {
-                var pos = cut.Normal * cut.Distance + new Vector2(-cut.Normal.y, cut.Normal.x) * Math.Clamp(along,
-                    float.IsNegativeInfinity(cut.Min) ? -1024f : cut.Min,
-                    float.IsPositiveInfinity(cut.Max) ? 1024f : cut.Max);
+                var pos = cut.Normal * cut.Distance + new Vector2( -cut.Normal.y, cut.Normal.x ) * along;
 
                 return Origin + Tu * pos.x + Tv * pos.y;
             }

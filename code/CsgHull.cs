@@ -227,45 +227,7 @@ namespace Sandbox.Csg
 
                 // Face is coplanar and adjacent to one already in this hull
 
-                var hasFoundDividingCut = false;
-
-                foreach ( var otherCut in face.FaceCuts )
-                {
-                    var canAdd = true;
-
-                    for ( var i = 0; i < adjacentFace.FaceCuts.Count; i++ )
-                    {
-                        var thisCut = adjacentFace.FaceCuts[i];
-
-                        if ( thisCut.ApproxEquals( otherCut ) )
-                        {
-                            thisCut.Min = Math.Min( thisCut.Min, otherCut.Min );
-                            thisCut.Max = Math.Max( thisCut.Max, otherCut.Max );
-
-                            adjacentFace.FaceCuts[i] = thisCut;
-                            canAdd = false;
-
-                            break;
-                        }
-
-                        if ( thisCut.ApproxEquals( -otherCut ) )
-                        {
-                            adjacentFace.FaceCuts.RemoveAt( i );
-
-                            canAdd = false;
-                            hasFoundDividingCut = true;
-
-                            break;
-                        }
-                    }
-
-                    if ( canAdd )
-                    {
-                        adjacentFace.FaceCuts.Add( otherCut );
-                    }
-                }
-
-                Assert.True( hasFoundDividingCut );
+                Assert.True( adjacentFace.FaceCuts.TryMerge( face.FaceCuts ) );
 
                 // Merge in sub faces
 
@@ -280,6 +242,48 @@ namespace Sandbox.Csg
             other.SetEmpty( this );
 
             return true;
+        }
+
+        public int MergeSubFaces()
+        {
+            var mergeCount = 0;
+
+            foreach ( var face in _faces )
+            {
+                for ( var i = 0; i < face.SubFaces.Count; i++ )
+                {
+                    var subFace = face.SubFaces[i];
+
+                    bool merged;
+
+                    do
+                    {
+                        merged = false;
+
+                        for ( var j = i + 1; j < face.SubFaces.Count; ++j )
+                        {
+                            var otherSubFace = face.SubFaces[j];
+
+                            if ( otherSubFace.Neighbor != subFace.Neighbor ) continue;
+                            if ( otherSubFace.Material != subFace.Material ) continue;
+
+                            if ( !subFace.FaceCuts.TryMerge( otherSubFace.FaceCuts ) )
+                            {
+                                continue;
+                            }
+
+                            face.SubFaces.RemoveAt( j );
+
+                            merged = true;
+                            mergeCount += 1;
+
+                            break;
+                        }
+                    } while ( merged );
+                }
+            }
+
+            return mergeCount;
         }
 
         public int GetSign( Vector3 pos )

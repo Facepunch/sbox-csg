@@ -164,13 +164,15 @@ namespace Sandbox.Csg
                 return false;
             }
 
+            if ( faceCuts.Count >= 3 ) return false;
+
             foreach ( var cut in faceCuts )
             {
                 if ( float.IsInfinity( cut.Min ) ) return false;
                 if ( float.IsInfinity( cut.Max ) ) return false;
             }
 
-            return faceCuts.Count < 3;
+            return true;
         }
 
         public static bool Contains( this List<CsgHull.FaceCut> faceCuts, Vector2 pos )
@@ -206,6 +208,100 @@ namespace Sandbox.Csg
         public static float Dot( Vector2 a, Vector2 b )
         {
             return a.x * b.x + a.y * b.y;
+        }
+
+        public static bool TryMerge( this List<CsgHull.FaceCut> faceCuts, List<CsgHull.FaceCut> otherCuts )
+        {
+            Assert.True( faceCuts != otherCuts );
+
+            if ( faceCuts.Count < 3 || otherCuts.Count < 3 ) return false;
+
+            var newCuts = RentFaceCutList();
+
+            try
+            {
+                newCuts.AddRange( faceCuts );
+
+                var dividingCutIndex = -1;
+
+                foreach ( var otherCut in otherCuts )
+                {
+                    if ( float.IsInfinity( otherCut.Min ) || float.IsInfinity( otherCut.Max ) )
+                    {
+                        return false;
+                    }
+
+                    var canAdd = true;
+
+                    for ( var i = 0; i < faceCuts.Count; i++ )
+                    {
+                        var thisCut = faceCuts[i];
+
+                        if ( thisCut.ApproxEquals( otherCut ) )
+                        {
+                            thisCut.Min = Math.Min( thisCut.Min, otherCut.Min );
+                            thisCut.Max = Math.Max( thisCut.Max, otherCut.Max );
+
+                            newCuts[i] = thisCut;
+                            canAdd = false;
+
+                            break;
+                        }
+
+                        if ( thisCut.ApproxEquals( -otherCut ) )
+                        {
+                            canAdd = false;
+                            dividingCutIndex = i;
+                            break;
+                        }
+                    }
+
+                    if ( canAdd )
+                    {
+                        newCuts.Add( otherCut );
+                    }
+                }
+
+                if ( dividingCutIndex == -1 )
+                {
+                    return false;
+                }
+
+                newCuts.RemoveAt( dividingCutIndex );
+
+                // Convexity check
+
+                foreach ( var faceCut in faceCuts )
+                {
+                    var pos = faceCut.GetPos( faceCut.Min );
+
+                    foreach ( var newCut in newCuts )
+                    {
+                        if ( newCut.GetSign( pos ) < 0 ) return false;
+                    }
+                }
+
+                foreach ( var faceCut in otherCuts )
+                {
+                    var pos = faceCut.GetPos( faceCut.Min );
+
+                    foreach ( var newCut in newCuts )
+                    {
+                        if ( newCut.GetSign( pos ) < 0 ) return false;
+                    }
+                }
+
+                // Output
+
+                faceCuts.Clear();
+                faceCuts.AddRange( newCuts );
+
+                return true;
+            }
+            finally
+            {
+                Return( newCuts );
+            }
         }
 
         public static bool Split( this List<CsgHull.FaceCut> faceCuts, CsgHull.FaceCut splitCut, List<CsgHull.FaceCut> outNegative = null )

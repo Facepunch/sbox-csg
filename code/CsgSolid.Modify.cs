@@ -340,18 +340,19 @@ namespace Sandbox.Csg
                     AddHull( hull );
                 }
 
-                if ( op != CsgOperator.Paint )
+                // Try to merge adjacent hulls / sub faces
+
+                var hullMergeCount = 0;
+                var subFaceMergeCount = 0;
+
+                var elapsed = Timer.Elapsed;
+
+                foreach ( var hull in changedHulls )
                 {
-                    // Try to merge adjacent hulls
-
-                    var mergeCount = 0;
-
-                    var elapsed = Timer.Elapsed;
-
-                    foreach ( var hull in changedHulls )
+                    if ( hull.IsEmpty ) continue;
+                    
+                    if ( op != CsgOperator.Paint )
                     {
-                        if ( hull.IsEmpty ) continue;
-
                         bool merged;
 
                         do
@@ -368,7 +369,7 @@ namespace Sandbox.Csg
 
                                 if ( hull.TryMerge( neighbor ) )
                                 {
-                                    ++mergeCount;
+                                    ++hullMergeCount;
 
                                     RemoveHull( neighbor );
 
@@ -379,10 +380,12 @@ namespace Sandbox.Csg
                         } while ( merged );
                     }
 
-                    if ( mergeCount > 0 && LogTimings )
-                    {
-                        Log.Info( $"{Host.Name} Merged {mergeCount} times in {(Timer.Elapsed - elapsed).TotalMilliseconds:F2}ms" );
-                    }
+                    subFaceMergeCount += hull.MergeSubFaces();
+                }
+
+                if ( hullMergeCount + subFaceMergeCount > 0 && LogTimings )
+                {
+                    Log.Info( $"{Host.Name} Merged {hullMergeCount} hulls, {subFaceMergeCount} sub faces in {(Timer.Elapsed - elapsed).TotalMilliseconds:F2}ms" );
                 }
             }
             finally
