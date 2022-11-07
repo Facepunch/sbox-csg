@@ -109,6 +109,9 @@ namespace Sandbox.Csg
         private int _nextDisconnectionIndex;
 
         [Net]
+        public bool DisconnectIslands { get; set; } = true;
+
+        [Net]
         public CsgSolid ServerDisconnectedFrom { get; set; }
 
         public int ClientDisconnectionIndex { get; set; }
@@ -261,6 +264,7 @@ namespace Sandbox.Csg
 
         private bool ConnectivityUpdate()
         {
+            if ( !DisconnectIslands ) return false;
             if ( !UpdateIslands() ) return false;
 
             // Find all islands
