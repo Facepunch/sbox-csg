@@ -186,7 +186,7 @@ namespace Sandbox.Csg
         [ThreadStatic]
         private static List<int> _sIndices;
 
-        private static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
+        internal static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
             where T : IList<CsgHull>
         {
             _sSubFaces ??= new List<SubFaceIndices>();

@@ -9,6 +9,8 @@ namespace Sandbox.Csg
     [GameResource("CSG Brush", "csg", "A simple mesh that can be used to modify a CsgSolid.", Icon = "brush")]
     public class CsgBrush : GameResource
     {
+        public static CsgMaterial DefaultMaterial { get; set; }
+
         public struct ConvexSolid
         {
             public List<Plane> Planes { get; set; }
@@ -25,7 +27,19 @@ namespace Sandbox.Csg
 
         public List<ConvexSolid> ConvexSolids { get; set; }
 
+        [HideInEditor]
+        public Model Model
+        {
+            get
+            {
+                UpdateModel();
+
+                return _model;
+            }
+        }
+
         private List<CsgHull> _hulls;
+        private Model _model;
 
         public int CreateHulls( List<CsgHull> outHulls )
         {
@@ -49,7 +63,7 @@ namespace Sandbox.Csg
 
             foreach ( var solidInfo in ConvexSolids )
             {
-                var hull = new CsgHull();
+                var hull = new CsgHull { Material = DefaultMaterial };
 
                 if ( solidInfo.Planes != null )
                 {
@@ -74,11 +88,32 @@ namespace Sandbox.Csg
             }
         }
 
+        private void UpdateModel()
+        {
+            if ( _model != null ) return;
+
+            UpdateSolids();
+
+            var meshes = new Dictionary<int, Mesh>();
+
+            Assert.True( CsgSolid.UpdateMeshes( meshes, _hulls ) );
+
+            var modelBuilder = new ModelBuilder();
+
+            foreach ( var (_, mesh) in meshes )
+            {
+                modelBuilder.AddMesh( mesh );
+            }
+
+            _model = modelBuilder.Create();
+        }
+
         protected override void PostLoad()
         {
             base.PostLoad();
 
             _hulls = null;
+            _model = null;
         }
 
         protected override void PostReload()
@@ -86,6 +121,7 @@ namespace Sandbox.Csg
             base.PostReload();
 
             _hulls = null;
+            _model = null;
         }
     }
 }
