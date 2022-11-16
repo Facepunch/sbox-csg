@@ -39,5 +39,25 @@ namespace Sandbox.Csg
         {
             get => string.IsNullOrEmpty( Material ) ? null : _runtimeMaterial ??= Sandbox.Material.Load( Material );
         }
+
+        public static CsgMaterial Deserialize( ref NetRead reader )
+        {
+            var resourceId = reader.Read<int>();
+
+            Assert.True( resourceId != 0 );
+
+            var mat = ResourceLibrary.Get<CsgMaterial>( resourceId );
+
+            Assert.NotNull( mat );
+
+            return mat;
+        }
+
+        public void Serialize( NetWrite writer )
+        {
+            Assert.True( ResourceId != 0 );
+
+            writer.Write( ResourceId );
+        }
     }
 }

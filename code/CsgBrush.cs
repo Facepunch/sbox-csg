@@ -123,5 +123,66 @@ namespace Sandbox.Csg
             _hulls = null;
             _model = null;
         }
+
+        public static CsgBrush Deserialize( ref NetRead reader )
+        {
+            var resourceId = reader.Read<int>();
+
+            if ( resourceId != 0 )
+            {
+                var brush = ResourceLibrary.Get<CsgBrush>( resourceId );
+
+                Assert.NotNull( brush );
+
+                return brush;
+            }
+
+            var solidCount = reader.Read<int>();
+            var solids = new List<ConvexSolid>( solidCount );
+
+            for ( var i = 0; i < solidCount; i++ )
+            {
+                var planeCount = reader.Read<int>();
+
+                var solid = new ConvexSolid
+                {
+                    Planes = new List<Plane>( planeCount )
+                };
+
+                solids.Add( solid );
+
+                for ( var j = 0; j < planeCount; j++ )
+                {
+                    solid.Planes.Add( reader.Read<Plane>() );
+                }
+            }
+
+            return new CsgBrush
+            {
+                ConvexSolids = solids
+            };
+        }
+
+        public void Serialize( NetWrite writer )
+        {
+            writer.Write( ResourceId );
+
+            if ( ResourceId != 0 )
+            {
+                return;
+            }
+
+            writer.Write( ConvexSolids.Count );
+
+            foreach ( var solid in ConvexSolids )
+            {
+                writer.Write( solid.Planes.Count );
+
+                foreach ( var plane in solid.Planes )
+                {
+                    writer.Write( plane );
+                }
+            }
+        }
     }
 }

@@ -12,7 +12,7 @@ namespace Sandbox.Csg
         Disconnect
     }
 
-    internal record struct CsgModification( int Brush, int Material, CsgOperator Operator, Matrix Transform );
+    internal record struct CsgModification( CsgOperator Operator, CsgBrush Brush, CsgMaterial Material, Matrix? Transform );
     
     partial class CsgSolid
     {
@@ -74,7 +74,7 @@ namespace Sandbox.Csg
 
                 for ( var i = 0; i < msgCount; i++ )
                 {
-                    msg.Write( _modifications[prevCount + i] );
+                    WriteModification( msg, _modifications[prevCount + i] );
                 }
 
                 msg.SendRpc( To.Single( client ), null );
@@ -83,7 +83,7 @@ namespace Sandbox.Csg
             }
         }
 
-        private void ReceiveModifications( NetRead read )
+        private void ReceiveModifications( ref NetRead read )
         {
             var prevCount = read.Read<int>();
             var msgCount = read.Read<int>();
@@ -93,10 +93,114 @@ namespace Sandbox.Csg
 
             for ( var i = 0; i < msgCount; ++i )
             {
-                _modifications.Add( read.Read<CsgModification>() );
+                _modifications.Add( ReadModification( ref read ) );
             }
 
             OnModificationsChanged();
+        }
+
+        private static void WriteModification( NetWrite writer, in CsgModification value )
+        {
+            // Write operator
+
+            writer.Write( value.Operator );
+
+            // Write brush
+
+            switch ( value.Operator )
+            {
+                case CsgOperator.Disconnect:
+                    break;
+
+                default:
+                    Assert.NotNull( value.Brush );
+                    value.Brush.Serialize( writer );
+                    break;
+            }
+
+            // Write material
+
+            switch ( value.Operator )
+            {
+                case CsgOperator.Disconnect:
+                case CsgOperator.Subtract:
+                    break;
+
+                default:
+                    Assert.NotNull( value.Material );
+                    value.Material.Serialize( writer );
+                    break;
+            }
+
+            // Write transform
+
+            switch ( value.Operator )
+            {
+                case CsgOperator.Disconnect:
+                    break;
+
+                default:
+                    writer.Write( value.Transform.HasValue );
+
+                    if ( value.Transform.HasValue )
+                    {
+                        writer.Write( value.Transform.Value );
+                    }
+                    break;
+            }
+        }
+
+        private static CsgModification ReadModification( ref NetRead reader )
+        {
+            CsgBrush brush = null;
+            CsgMaterial material = null;
+            Matrix? transform = null;
+
+            // Read operator
+
+            var op = reader.Read<CsgOperator>();
+
+            // Read brush
+
+            switch ( op )
+            {
+                case CsgOperator.Disconnect:
+                    break;
+
+                default:
+                    brush = CsgBrush.Deserialize( ref reader );
+                    break;
+            }
+
+            // Read material
+
+            switch ( op )
+            {
+                case CsgOperator.Disconnect:
+                case CsgOperator.Subtract:
+                    break;
+
+                default:
+                    material = CsgMaterial.Deserialize( ref reader );
+                    break;
+            }
+
+            // Read transform
+
+            switch ( op )
+            {
+                case CsgOperator.Disconnect:
+                    break;
+
+                default:
+                    if ( reader.Read<bool>() )
+                    {
+                        transform = reader.Read<Matrix>();
+                    }
+                    break;
+            }
+
+            return new CsgModification( op, brush, material, transform );
         }
 
         protected override void OnCallRemoteProcedure( int id, NetRead read )
@@ -104,7 +208,7 @@ namespace Sandbox.Csg
             switch ( id )
             {
                 case SendModificationsRpc:
-                    ReceiveModifications( read );
+                    ReceiveModifications( ref read );
                     break;
 
                 default:
@@ -113,8 +217,13 @@ namespace Sandbox.Csg
             }
         }
 
-        private static Matrix CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
+        private static Matrix? CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
+            if ( position == null && scale == null && rotation == null )
+            {
+                return null;
+            }
+
             var transform = Matrix.Identity;
 
             if ( position != null )
@@ -140,13 +249,13 @@ namespace Sandbox.Csg
         {
             Assert.NotNull( material );
 
-            return Modify( brush, material, CsgOperator.Add, CreateMatrix( position, scale, rotation ) );
+            return Modify( CsgOperator.Add, brush, material, CreateMatrix( position, scale, rotation ) );
         }
 
         public bool Subtract( CsgBrush brush,
             Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {
-            return Modify( brush, null, CsgOperator.Subtract, CreateMatrix( position, scale, rotation ) );
+            return Modify( CsgOperator.Subtract, brush, null, CreateMatrix( position, scale, rotation ) );
         }
 
         public bool Replace( CsgBrush brush, CsgMaterial material,
@@ -154,7 +263,7 @@ namespace Sandbox.Csg
         {
             Assert.NotNull( material );
 
-            return Modify( brush, material, CsgOperator.Replace, CreateMatrix( position, scale, rotation ) );
+            return Modify( CsgOperator.Replace, brush, material, CreateMatrix( position, scale, rotation ) );
         }
 
         public bool Paint( CsgBrush brush, CsgMaterial material,
@@ -162,12 +271,12 @@ namespace Sandbox.Csg
         {
             Assert.NotNull( material );
 
-            return Modify( brush, material, CsgOperator.Paint, CreateMatrix( position, scale, rotation ) );
+            return Modify( CsgOperator.Paint, brush, material, CreateMatrix( position, scale, rotation ) );
         }
 
         private bool Disconnect()
         {
-            return Modify( null, null, CsgOperator.Disconnect, default );
+            return Modify( CsgOperator.Disconnect, null, null, default );
         }
 
         private void OnModificationsChanged()
@@ -181,11 +290,7 @@ namespace Sandbox.Csg
 
             while ( _appliedModifications < _modifications.Count )
             {
-                var next = _modifications[_appliedModifications++];
-                var brush = next.Brush == 0 ? null : ResourceLibrary.Get<CsgBrush>( next.Brush );
-                var material = next.Material == 0 ? null : ResourceLibrary.Get<CsgMaterial>( next.Material );
-
-                Modify( next, brush, material );
+                ModifyInternal( _modifications[_appliedModifications++] );
             }
         }
 
@@ -193,13 +298,13 @@ namespace Sandbox.Csg
             * Matrix.CreateScale( 1f / Scale )
             * Matrix.CreateRotation( Rotation.Inverse );
 
-        private bool Modify( CsgBrush brush, CsgMaterial material, CsgOperator op, in Matrix transform )
+        private bool Modify( CsgOperator op, CsgBrush brush, CsgMaterial material, in Matrix? transform )
         {
             Host.AssertServer( nameof(Modify) );
 
-            var mod = new CsgModification( brush?.ResourceId ?? 0, material?.ResourceId ?? 0, op, transform * WorldToLocal );
+            var mod = new CsgModification( op, brush, material, transform.HasValue ? transform.Value * WorldToLocal : null );
             
-            if ( Modify( mod, brush, material ) )
+            if ( ModifyInternal( mod ) )
             {
                 AddModification( mod );
                 return true;
@@ -208,7 +313,7 @@ namespace Sandbox.Csg
             return false;
         }
 
-        private bool Modify( in CsgModification modification, CsgBrush brush, CsgMaterial material )
+        private bool ModifyInternal( in CsgModification modification )
         {
             if ( Deleted )
             {
@@ -231,14 +336,18 @@ namespace Sandbox.Csg
                     return ConnectivityUpdate();
                 }
 
-                brush.CreateHulls( hulls );
+                modification.Brush.CreateHulls( hulls );
 
                 var changed = false;
 
                 foreach ( var solid in hulls )
                 {
-                    solid.Material = material;
-                    solid.Transform( modification.Transform );
+                    solid.Material = modification.Material;
+
+                    if ( modification.Transform.HasValue )
+                    {
+                        solid.Transform( modification.Transform.Value );
+                    }
                 }
 
                 foreach ( var solid in hulls )
