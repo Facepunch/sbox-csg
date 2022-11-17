@@ -106,6 +106,11 @@ namespace Sandbox.Csg
                 Origin = Normal * plane.Distance;
             }
 
+            public Vector2 Project( Vector3 pos )
+            {
+                return new Vector2( Vector3.Dot( pos, Tu ), Vector3.Dot( pos, Tv ) );
+            }
+
             public CsgHull.FaceCut GetCut( CsgPlane cutPlane )
             {
                 if (1f - Math.Abs(Vector3.Dot(Normal, cutPlane.Normal)) <= CsgHelpers.UnitEpsilon)
@@ -132,6 +137,11 @@ namespace Sandbox.Csg
                         / Vector3.Dot(cutPlane.Normal, cutNormal);
 
                 return new CsgHull.FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
+            }
+
+            public Vector3 GetPoint( Vector2 uv )
+            {
+                return Origin + Tu * uv.x + Tv * uv.y;
             }
 
             public Vector3 GetPoint( CsgHull.FaceCut cut )

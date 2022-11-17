@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Sandbox.Csg
 {
     [GameResource("CSG Brush", "csg", "A simple mesh that can be used to modify a CsgSolid.", Icon = "brush")]
-    public class CsgBrush : GameResource
+    public partial class CsgBrush : GameResource
     {
         public static CsgMaterial DefaultMaterial { get; set; }
 
@@ -20,6 +20,9 @@ namespace Sandbox.Csg
         {
             public static implicit operator CsgPlane( Plane plane ) =>
                 new CsgPlane( plane.Normal.Normal, plane.Distance );
+
+            public static implicit operator Plane( CsgPlane plane ) =>
+                new Plane { Normal = plane.Normal, Distance = plane.Distance };
 
             public Vector3 Normal { get; set; }
             public float Distance { get; set; }

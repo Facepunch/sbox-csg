@@ -89,7 +89,7 @@ namespace Sandbox.Csg
             var msgCount = read.Read<int>();
             var totalCount = read.Read<int>();
 
-            Assert.AreEqual( prevCount, _modifications.Count );
+            CsgHelpers.AssertAreEqual( prevCount, _modifications.Count );
 
             for ( var i = 0; i < msgCount; ++i )
             {

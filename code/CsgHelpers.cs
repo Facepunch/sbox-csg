@@ -423,5 +423,131 @@ namespace Sandbox.Csg
                 Return( outPositive );
             }
         }
+
+        public static float GetArea( this List<Vector2> vertices )
+        {
+            if ( vertices.Count < 3 ) return 0f;
+
+            var area = 0f;
+            var prev = vertices[^1];
+
+            foreach ( var next in vertices )
+            {
+                area += (next.x - prev.x) * (next.y + prev.y);
+                prev = next;
+            }
+
+            return area * 0.5f;
+        }
+
+        private static int Mod( int k, int n ) => (k %= n) < 0 ? k + n : k;
+
+        private static int FindEarIndex( List<Vector2> vertices, int offset )
+        {
+            Assert.True( vertices.Count - offset >= 3 );
+
+            if ( vertices.Count - offset == 3 )
+            {
+                return offset;
+            }
+
+            var count = vertices.Count - offset;
+
+            for ( var i = offset; i < vertices.Count; i++ )
+            {
+                var prev = vertices.GetWithinRange( offset, i - 1 );
+                var curr = vertices[i];
+                var next = vertices.GetWithinRange( offset, i + 1 );
+
+                if ( Cross( next - curr, curr - prev ) <= 0f )
+                {
+                    continue;
+                }
+
+                var anyIntersections = false;
+
+                for ( var j = 1; j < count - 1; j++ )
+                {
+                    var a = vertices.GetWithinRange( offset, i + j );
+                    var b = vertices.GetWithinRange( offset, i + j + 1 );
+
+                    if ( CheckLineIntersection( prev, next, a, b ) )
+                    {
+                        anyIntersections = true;
+                        break;
+                    }
+                }
+
+                if ( anyIntersections )
+                {
+                    continue;
+                }
+
+                return i;
+            }
+
+            throw new Exception();
+        }
+
+        private static bool Ccw( Vector2 a, Vector2 b, Vector2 c )
+        {
+            return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+        }
+
+        private static bool CheckLineIntersection( Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2 )
+        {
+            var a = a2 - a1;
+            var b = b2 - b1;
+
+            if ( Math.Abs( Cross( a, b ) ) < UnitEpsilon ) return false;
+
+            return Ccw( a1, b1, b2 ) != Ccw( a2, b1, b2 ) && Ccw( a1, a2, b1 ) != Ccw( a1, a2, b2 );
+        }
+
+        private static T GetWithinRange<T>( this IList<T> list, int offset, int index )
+        {
+            return list[offset + Mod( index - offset, list.Count - offset )];
+        }
+
+        private static T GetWithinRange<T>( this IList<T> list, int offset, int count, int index )
+        {
+            return list[offset + Mod( index - offset, count )];
+        }
+
+        public static void MakeConvex( List<Vector2> vertices, List<int> outVertCounts )
+        {
+            Assert.True( vertices.Count >= 3 );
+
+            if ( vertices.GetArea() < 0f )
+            {
+                vertices.Reverse();
+            }
+
+            // Ear clipping, can speed this up
+            // Also this only outputs triangles for now
+
+            var offset = 0;
+
+            while ( vertices.Count - offset > 3 )
+            {
+                var earIndex = FindEarIndex( vertices, offset );
+
+                var a = vertices.GetWithinRange( offset, earIndex - 1 );
+                var b = vertices[earIndex];
+                var c = vertices.GetWithinRange( offset, earIndex + 1 );
+
+                vertices.RemoveAt( earIndex );
+
+                vertices.Insert( offset++, a );
+                vertices.Insert( offset++, b );
+                vertices.Insert( offset++, c );
+
+                outVertCounts.Add( 3 );
+            }
+
+            AssertAreEqual( 3, vertices.Count - offset );
+
+            outVertCounts.Add( 3 );
+        }
     }
 }
