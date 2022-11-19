@@ -471,7 +471,7 @@ namespace Sandbox.Csg
                     var a = vertices.GetWithinRange( offset, i + j );
                     var b = vertices.GetWithinRange( offset, i + j + 1 );
 
-                    if ( CheckLineIntersection( prev, next, a, b ) )
+                    if ( LinesIntersect( prev, next, a, b ) )
                     {
                         anyIntersections = true;
                         break;
@@ -494,7 +494,7 @@ namespace Sandbox.Csg
             return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
         }
 
-        private static bool CheckLineIntersection( Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2 )
+        public static bool LinesIntersect( Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2 )
         {
             var a = a2 - a1;
             var b = b2 - b1;
