@@ -640,6 +640,9 @@ namespace Sandbox.Csg
                     Neighbor = solidA
                 } );
 
+                solidA.InvalidateNeighbors();
+                solidB.InvalidateNeighbors();
+
                 solidA.InvalidateMesh();
                 solidB.InvalidateMesh();
 

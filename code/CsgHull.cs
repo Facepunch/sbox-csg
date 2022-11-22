@@ -62,6 +62,13 @@ namespace Sandbox.Csg
             Index = NextIndex++;
         }
 
+        public void InvalidateNeighbors()
+        {
+            _neighborsInvalid = true;
+
+            GridCell?.InvalidateConnectivity();
+        }
+
         public void InvalidateMesh()
         {
             GridCell?.InvalidateMesh();

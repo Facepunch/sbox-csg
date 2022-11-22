@@ -329,6 +329,8 @@ namespace Sandbox.Csg
                     continue;
                 }
 
+                changed = true;
+
                 thisFace.RemoveSubFacesInside( otherFace.FaceCuts );
 
                 // Now just add the sub-faces from other
@@ -340,8 +342,6 @@ namespace Sandbox.Csg
                     thisFace.SubFaces.Add( subFace.Clone() );
 
                     subFace.Neighbor?.ReplaceNeighbor( -thisFace.Plane, other, this );
-
-                    changed = true;
                 }
             }
 
