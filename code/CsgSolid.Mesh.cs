@@ -145,7 +145,7 @@ namespace Sandbox.Csg
                     continue;
                 }
 
-                if ( UpdateMeshes( cell.Meshes, cell.Hulls ) || !cell.SceneObject.IsValid() )
+                if ( UpdateMeshes( cell.Meshes, cell.Hulls ) || !cell.SceneObject.IsValid() && cell.Meshes.Count > 0 )
                 {
                     var modelBuilder = new ModelBuilder();
                     
@@ -159,7 +159,7 @@ namespace Sandbox.Csg
                     cell.SceneObject?.Delete();
                     cell.SceneObject = new SceneObject( Scene, model, Transform );
                 }
-                else
+                else if ( cell.SceneObject.IsValid() )
                 {
                     cell.SceneObject.Transform = Transform;
                 }
