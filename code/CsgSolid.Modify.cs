@@ -21,10 +21,10 @@ namespace Sandbox.Csg
 
         private int _appliedModifications;
         private readonly List<CsgModification> _modifications = new List<CsgModification>();
-        private readonly Dictionary<Entity, int> _sentModifications = new Dictionary<Entity, int>();
+        private readonly Dictionary<IEntity, int> _sentModifications = new Dictionary<IEntity, int>();
 
         [ThreadStatic]
-        private static List<Entity> _sToRemove;
+        private static List<IEntity> _sToRemove;
 
         private void AddModification( in CsgModification modification )
         {
@@ -33,7 +33,7 @@ namespace Sandbox.Csg
 
         private void SendModifications()
         {
-            _sToRemove ??= new List<Entity>();
+            _sToRemove ??= new List<IEntity>();
             _sToRemove.Clear();
 
             foreach ( var (pawn, _) in _sentModifications )
@@ -49,7 +49,7 @@ namespace Sandbox.Csg
                 _sentModifications.Remove( entity );
             }
 
-            foreach ( var client in Client.All )
+            foreach ( var client in Clients)
             {
                 if ( client.IsBot ) continue;
                 if ( client.Pawn is null ) continue;
@@ -300,7 +300,7 @@ namespace Sandbox.Csg
 
         private bool Modify( CsgOperator op, CsgBrush brush, CsgMaterial material, in Matrix? transform )
         {
-            Host.AssertServer( nameof(Modify) );
+            AssertServer( nameof(Modify) );
 
             var mod = new CsgModification( op, brush, material, transform.HasValue ? transform.Value * WorldToLocal : null );
             
