@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
@@ -117,7 +118,7 @@ namespace Sandbox.Csg
 
             if ( LogTimings )
             {
-                Log.Info( $"{Host.Name} SetupContainers( {gridSize} )" );
+                Log.Info( $"SetupContainers( {gridSize} )" );
             }
 
             if ( gridSize.x < 0f || gridSize.y < 0f || gridSize.z < 0f )
@@ -135,7 +136,7 @@ namespace Sandbox.Csg
 
             _grid = new Dictionary<(int X, int Y, int Z), GridCell>();
 
-            if ( IsClient )
+            if ( Game.IsClient )
             {
                 OnModificationsChanged();
             }

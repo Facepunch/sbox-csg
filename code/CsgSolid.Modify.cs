@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
@@ -49,15 +50,15 @@ namespace Sandbox.Csg
                 _sentModifications.Remove( entity );
             }
 
-            foreach ( var client in Client.All )
+            foreach ( var client in Game.Clients )
             {
                 if ( client.IsBot ) continue;
-                if ( client.Pawn is null ) continue;
+                if ( client.Pawn is not Entity pawn ) continue;
 
-                if ( !_sentModifications.TryGetValue( client.Pawn, out var prevCount ) )
+                if ( !_sentModifications.TryGetValue( pawn, out var prevCount ) )
                 {
                     prevCount = 0;
-                    _sentModifications.Add( client.Pawn, prevCount );
+                    _sentModifications.Add( pawn, prevCount );
                 }
 
                 Assert.True( prevCount <= _modifications.Count );
@@ -79,7 +80,7 @@ namespace Sandbox.Csg
 
                 msg.SendRpc( To.Single( client ), null );
 
-                _sentModifications[client.Pawn] = prevCount + msgCount;
+                _sentModifications[pawn] = prevCount + msgCount;
             }
         }
 
@@ -300,7 +301,7 @@ namespace Sandbox.Csg
 
         private bool Modify( CsgOperator op, CsgBrush brush, CsgMaterial material, in Matrix? transform )
         {
-            Host.AssertServer( nameof(Modify) );
+            Game.AssertServer( nameof(Modify) );
 
             var mod = new CsgModification( op, brush, material, transform.HasValue ? transform.Value * WorldToLocal : null );
             
@@ -317,7 +318,7 @@ namespace Sandbox.Csg
         {
             if ( Deleted )
             {
-                if ( IsServer )
+                if ( Game.IsServer )
                 {
                     Log.Warning( $"Attempting to modify a deleted {nameof(CsgSolid)}" );
                 }
@@ -363,7 +364,7 @@ namespace Sandbox.Csg
 
                 if ( LogTimings )
                 {
-                    Log.Info( $"{Host.Name} Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+                    Log.Info( $"Modify {modification.Operator}: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
                 }
             }
         }
@@ -389,7 +390,7 @@ namespace Sandbox.Csg
 
                 if ( LogTimings )
                 {
-                    Log.Info( $"{Host.Name} GetHullsTouching: {(Timer.Elapsed - elapsedBefore).TotalMilliseconds:F2}ms" );
+                    Log.Info( $"GetHullsTouching: {(Timer.Elapsed - elapsedBefore).TotalMilliseconds:F2}ms" );
                 }
 
                 foreach ( var next in nearbyHulls )
@@ -586,7 +587,7 @@ namespace Sandbox.Csg
 
                 if ( hullMergeCount + subFaceMergeCount > 0 && LogTimings )
                 {
-                    Log.Info( $"{Host.Name} Merged {hullMergeCount} hulls, {subFaceMergeCount} sub faces in {(Timer.Elapsed - elapsed).TotalMilliseconds:F2}ms" );
+                    Log.Info( $"Merged {hullMergeCount} hulls, {subFaceMergeCount} sub faces in {(Timer.Elapsed - elapsed).TotalMilliseconds:F2}ms" );
                 }
             }
             finally

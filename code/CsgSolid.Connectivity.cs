@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
@@ -335,7 +336,7 @@ namespace Sandbox.Csg
             {
                 Deleted = true;
 
-                if ( IsClientOnly || IsServer )
+                if ( IsClientOnly || Game.IsServer )
                 {
                     Delete();
                 }
@@ -408,13 +409,13 @@ namespace Sandbox.Csg
 
                 var disconnectionIndex = _nextDisconnectionIndex++;
 
-                if ( IsServer )
+                if ( Game.IsServer )
                 {
                     child.ServerDisconnectionIndex = disconnectionIndex;
                     child.ServerDisconnectedFrom = this;
                 }
 
-                if ( IsClient )
+                if ( Game.IsClient )
                 {
                     child.ClientDisconnectionIndex = disconnectionIndex;
 

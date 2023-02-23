@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
@@ -30,7 +31,7 @@ namespace Sandbox.Csg
             {
                 if ( LogTimings )
                 {
-                    Log.Info( $"{Host.Name} Creating physics body for {Name}" );
+                    Log.Info( $"Creating physics body for {Name}" );
                 }
 
                 SetupPhysicsFromSphere( IsStatic ? PhysicsMotionType.Static : PhysicsMotionType.Dynamic, 0f, 1f );
@@ -112,7 +113,7 @@ namespace Sandbox.Csg
 
             if ( LogTimings )
             {
-                Log.Info( $"{Host.Name} Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {changedColliders} of {PhysicsBody.Shapes.Count()}" );
+                Log.Info( $"Collision update: {Timer.Elapsed.TotalMilliseconds:F2}ms {changedColliders} of {PhysicsBody.Shapes.Count()}" );
             }
 
             return true;
@@ -171,7 +172,7 @@ namespace Sandbox.Csg
 
             if ( LogTimings )
             {
-                Log.Info( $"{Host.Name} Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
+                Log.Info( $"Mesh update: {Timer.Elapsed.TotalMilliseconds:F2}ms" );
             }
 
             return true;
