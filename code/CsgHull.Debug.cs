@@ -1,4 +1,6 @@
-﻿using System;
+﻿#if !SANDBOX_EDITOR
+
+using System;
 using System.Collections.Generic;
 
 namespace Sandbox.Csg
@@ -142,3 +144,5 @@ namespace Sandbox.Csg
         }
     }
 }
+
+#endif

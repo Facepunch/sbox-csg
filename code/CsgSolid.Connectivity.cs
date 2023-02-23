@@ -105,62 +105,6 @@ namespace Sandbox.Csg
 
     partial class CsgSolid
     {
-        public const float MinVolume = 0.125f;
-
-        private int _nextDisconnectionIndex;
-
-        [Net]
-        public bool DisconnectIslands { get; set; } = true;
-
-        [Net]
-        public CsgSolid ServerDisconnectedFrom { get; set; }
-
-        public int ClientDisconnectionIndex { get; set; }
-
-        [Net]
-        public int ServerDisconnectionIndex { get; set; }
-
-        private bool _copiedInitialGeometry;
-
-        private Dictionary<int, CsgSolid> ClientDisconnections { get; } = new();
-
-        private void CheckInitialGeometry()
-        {
-            if ( _copiedInitialGeometry || ServerDisconnectedFrom == null ) return;
-
-            if ( ServerDisconnectedFrom.ClientDisconnections.TryGetValue( ServerDisconnectionIndex, out var clientCopy ) )
-            {
-                ServerDisconnectedFrom.ClientDisconnections.Remove( ServerDisconnectionIndex );
-
-                _copiedInitialGeometry = true;
-                _appliedModifications = 0;
-
-                CsgHelpers.AssertAreEqual( _gridSize, clientCopy._gridSize );
-
-                Clear( true );
-
-                foreach ( var pair in clientCopy._grid )
-                {
-                    _grid.Add( pair.Key, pair.Value );
-
-                    pair.Value.Solid = this;
-                    pair.Value.InvalidateMesh();
-                    pair.Value.InvalidateCollision();
-                    pair.Value.InvalidateConnectivity();
-
-                    foreach ( var hull in pair.Value.Hulls )
-                    {
-                        hull.RemoveCollider();
-                    }
-                }
-
-                clientCopy.Clear( false );
-                clientCopy.Delete();
-
-                OnModificationsChanged();
-            }
-        }
-
         private bool UpdateIslands()
         {
             if ( _invalidConnectivity.Count == 0 ) return false;
@@ -258,14 +202,9 @@ namespace Sandbox.Csg
         private static HashSet<CsgIsland> _sIslandSet;
         [ThreadStatic]
         private static Queue<CsgIsland> _sIslandQueue;
-        [ThreadStatic]
-        private static List<(CsgIsland Root, int Count, float Volume)> _sChunks;
 
-        public bool Deleted { get; private set; }
-
-        private bool ConnectivityUpdate()
+        internal bool ConnectivityUpdate( List<(CsgIsland Root, int Count, float Volume)> outChunks )
         {
-            if ( !DisconnectIslands ) return false;
             if ( !UpdateIslands() ) return false;
 
             // Find all islands
@@ -284,7 +223,7 @@ namespace Sandbox.Csg
             // Find chunks of connected islands
 
             var queue = _sIslandQueue ??= new Queue<CsgIsland>();
-            var chunks = _sChunks ??= new List<(CsgIsland Root, int Count, float Volume)>();
+            var chunks = outChunks;
 
             chunks.Clear();
 
@@ -319,109 +258,6 @@ namespace Sandbox.Csg
             // Sort by volume (descending)
 
             chunks.Sort( ( a, b ) => Math.Sign( b.Volume - a.Volume ) );
-
-            if ( LogTimings )
-            {
-                Log.Info( $"Chunks: {chunks.Count}" );
-
-                foreach ( var chunk in chunks )
-                {
-                    Log.Info( $"  {chunk.Volume}, {chunk.Count}" );
-                }
-            }
-
-            // Handle the whole solid being too small / empty
-
-            if ( chunks.Count == 0 || chunks[0].Volume < MinVolume )
-            {
-                Deleted = true;
-
-                if ( IsClientOnly || Game.IsServer )
-                {
-                    Delete();
-                }
-                else
-                {
-                    EnableDrawing = false;
-                    PhysicsEnabled = false;
-                    EnableSolidCollisions = false;
-
-                    DeleteSceneObjects();
-                }
-
-                return true;
-            }
-
-            if ( chunks.Count == 1 ) return false;
-
-            // Time to split, let's wake up
-
-            if ( !IsStatic && PhysicsBody != null )
-            {
-                PhysicsBody.Sleeping = false;
-            }
-
-            // Leave most voluminous chunk in this solid, but create new solids for the rest
-
-            var visited = remaining;
-
-            foreach ( var chunk in chunks.Skip( 1 ) )
-            {
-                visited.Clear();
-                queue.Clear();
-
-                queue.Enqueue( chunk.Root );
-                visited.Add( chunk.Root );
-
-                while ( queue.Count > 0 )
-                {
-                    var next = queue.Dequeue();
-
-                    foreach ( var neighbor in next.Neighbors )
-                    {
-                        if ( visited.Add( neighbor ) )
-                        {
-                            queue.Enqueue( neighbor );
-                        }
-                    }
-                }
-
-                var child = chunk.Volume < MinVolume ? null : new CsgSolid( 0f )
-                {
-                    IsStatic = false,
-                    PhysicsEnabled = true,
-                    Transform = Transform
-                };
-
-                foreach ( var island in visited )
-                {
-                    foreach ( var hull in island.Hulls )
-                    {
-                        RemoveHull( hull );
-                        child?.AddHull( hull );
-                    }
-                }
-
-                if ( child == null )
-                {
-                    continue;
-                }
-
-                var disconnectionIndex = _nextDisconnectionIndex++;
-
-                if ( Game.IsServer )
-                {
-                    child.ServerDisconnectionIndex = disconnectionIndex;
-                    child.ServerDisconnectedFrom = this;
-                }
-
-                if ( Game.IsClient )
-                {
-                    child.ClientDisconnectionIndex = disconnectionIndex;
-
-                    ClientDisconnections.Add( disconnectionIndex, child );
-                }
-            }
 
             return true;
         }

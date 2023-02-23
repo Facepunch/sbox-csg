@@ -6,7 +6,6 @@ namespace Sandbox.Csg
 {
     partial class CsgSolid
     {
-        [Net]
         public Vector3 GridSize { get; set; }
 
         private Vector3 _gridSize;
@@ -20,6 +19,8 @@ namespace Sandbox.Csg
 
         internal class GridCell
         {
+            public (int X, int Y, int Z) Coord { get; }
+
             public List<CsgHull> Hulls { get; } = new List<CsgHull>();
             public List<CsgIsland> Islands { get; } = new List<CsgIsland>();
 
@@ -50,6 +51,12 @@ namespace Sandbox.Csg
             public bool CollisionInvalid { get; private set; }
             public bool MeshInvalid { get; private set; }
             public bool ConnectivityInvalid { get; private set; }
+
+            public GridCell( CsgSolid solid, (int X, int Y, int Z) coord )
+            {
+                Coord = coord;
+                Solid = solid;
+            }
 
             public void InvalidateCollision()
             {
@@ -116,11 +123,6 @@ namespace Sandbox.Csg
                 throw new Exception( "Containers already set up" );
             }
 
-            if ( LogTimings )
-            {
-                Log.Info( $"SetupContainers( {gridSize} )" );
-            }
-
             if ( gridSize.x < 0f || gridSize.y < 0f || gridSize.z < 0f )
             {
                 throw new ArgumentException( "Grid size must be non-negative.", nameof(gridSize) );
@@ -135,11 +137,6 @@ namespace Sandbox.Csg
             HasGrid = _gridSize != Vector3.Zero;
 
             _grid = new Dictionary<(int X, int Y, int Z), GridCell>();
-
-            if ( Game.IsClient )
-            {
-                OnModificationsChanged();
-            }
         }
 
         private void SubdivideGridAxis( Vector3 axis, List<CsgHull> hulls )
@@ -215,11 +212,6 @@ namespace Sandbox.Csg
                 count--;
 
                 (outHulls[count], outHulls[i]) = (outHulls[i], outHulls[count]);
-            }
-
-            if ( LogTimings )
-            {
-                Log.Info( $"Before: {outHulls.Count}, after: {count}" );
             }
 
             outHulls.RemoveRange( count, outHulls.Count - count );

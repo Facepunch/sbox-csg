@@ -4,71 +4,26 @@ using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
-    public partial class CsgSolid : ModelEntity
+    public partial class CsgSolid : IDisposable
     {
-        [ConVar.Server("csg_log", Help = "If set, CSG timing info is logged")]
-        public static bool LogTimings { get; set; }
+        public SceneWorld World { get; }
 
-        public CsgSolid()
-        {
-            Game.AssertClient( nameof(CsgSolid) );
-        }
+        public SceneObject SceneObject { get; }
 
-        public CsgSolid( Vector3 gridSize )
+        public CsgSolid( SceneWorld world, Vector3 gridSize )
         {
+            World = world;
             GridSize = gridSize;
 
-            SetupContainers( GridSize );
-        }
-
-        public override void Spawn()
-        {
-            base.Spawn();
-
-            Transmit = TransmitType.Always;
-        }
-
-        public override void ClientSpawn()
-        {
-            base.ClientSpawn();
+            SceneObject = new SceneCustomObject( world );
 
             SetupContainers( GridSize );
         }
 
-        [Event.Tick.Server]
-        private void ServerTick()
+        public void Dispose()
         {
-            if ( _invalidConnectivity.Count > 0 )
-            {
-                if ( Disconnect() && Deleted )
-                {
-                    return;
-                }
-            }
-
-            SendModifications();
-            CollisionUpdate();
-        }
-
-        [Event.Tick.Client]
-        private void ClientTick()
-        {
-            if ( !IsClientOnly )
-            {
-                CheckInitialGeometry();
-            }
-
-            if ( Deleted ) return;
-
-            MeshUpdate();
-            CollisionUpdate();
-        }
-
-        protected override void OnDestroy()
-        {
-            base.OnDestroy();
-
             DeleteSceneObjects();
+            Clear( true );
         }
 
         private void DeleteSceneObjects()
@@ -80,7 +35,7 @@ namespace Sandbox.Csg
             }
         }
 
-        private void Clear( bool removeColliders )
+        internal void Clear( bool removeColliders )
         {
             if ( removeColliders )
             {
@@ -153,7 +108,7 @@ namespace Sandbox.Csg
 
             if ( !_grid.TryGetValue( gridCoord, out var cell ) )
             {
-                _grid[gridCoord] = cell = new GridCell { Solid = this };
+                _grid[gridCoord] = cell = new GridCell( this, gridCoord );
             }
 
             hull.GridCoord = gridCoord;

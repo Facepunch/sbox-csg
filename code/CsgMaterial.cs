@@ -41,6 +41,7 @@ namespace Sandbox.Csg
             get => string.IsNullOrEmpty( Material ) ? null : _runtimeMaterial ??= Sandbox.Material.Load( Material );
         }
 
+#if !SANDBOX_EDITOR
         public static CsgMaterial Deserialize( ref NetRead reader )
         {
             var resourceId = reader.Read<int>();
@@ -60,5 +61,6 @@ namespace Sandbox.Csg
 
             writer.Write( ResourceId );
         }
+#endif
     }
 }

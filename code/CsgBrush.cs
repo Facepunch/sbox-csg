@@ -128,6 +128,7 @@ namespace Sandbox.Csg
             _model = null;
         }
 
+#if !SANDBOX_EDITOR
         public static CsgBrush Deserialize( ref NetRead reader )
         {
             var resourceId = reader.Read<int>();
@@ -188,5 +189,6 @@ namespace Sandbox.Csg
                 }
             }
         }
+#endif
     }
 }
