@@ -35,6 +35,27 @@ namespace Sandbox.Csg
             }
         }
 
+        public BBox CalculateBounds()
+        {
+            var mins = new Vector3( float.PositiveInfinity );
+            var maxs = new Vector3( float.NegativeInfinity );
+
+            foreach ( var (_, cell) in _grid )
+            {
+                foreach ( var hull in cell.Hulls )
+                {
+                    var bounds = hull.VertexBounds;
+
+                    mins = Vector3.Min( mins, bounds.Mins );
+                    maxs = Vector3.Max( maxs, bounds.Maxs );
+                }
+            }
+
+            return float.IsPositiveInfinity( mins.x )
+                ? new BBox( Vector3.Zero )
+                : new BBox( mins, maxs );
+        }
+
         internal void Clear( bool removeColliders )
         {
             if ( removeColliders )
