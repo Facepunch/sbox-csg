@@ -14,6 +14,11 @@ namespace Sandbox.Csg
 
         public struct ConvexSolid
         {
+            public CsgMaterial Material { get; set; }
+
+            public int PlaneCount => Planes?.Count ?? 0;
+
+            [HideInEditor]
             public List<Plane> Planes { get; set; }
         }
 
@@ -67,7 +72,7 @@ namespace Sandbox.Csg
 
             foreach ( var solidInfo in ConvexSolids )
             {
-                var hull = new CsgHull { Material = DefaultMaterial };
+                var hull = new CsgHull { Material = solidInfo.Material ?? DefaultMaterial };
 
                 if ( solidInfo.Planes != null )
                 {
