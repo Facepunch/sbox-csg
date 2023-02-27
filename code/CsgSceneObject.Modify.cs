@@ -13,9 +13,9 @@ namespace Sandbox.Csg
         Disconnect
     }
 
-    internal record struct CsgModification( CsgOperator Operator, CsgBrush Brush, CsgMaterial Material, Matrix? Transform );
-    
-    partial class CsgSolid
+    internal record struct CsgModification( CsgOperator Operator, CsgAsset Asset, CsgMaterial Material, Matrix? Transform );
+
+    partial class CsgSceneObject
     {
         private static Matrix? CreateMatrix( Vector3? position = null, Vector3? scale = null, Rotation? rotation = null )
         {

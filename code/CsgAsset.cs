@@ -7,10 +7,92 @@ using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
-    [GameResource("CSG Brush", "csg", "A simple mesh that can be used to modify a CsgSolid.", Icon = "brush")]
-    public partial class CsgBrush : GameResource
+    public enum BrushGeometryKind
     {
-        public static CsgMaterial DefaultMaterial { get; set; }
+        Cube,
+        Asset
+    }
+
+    public enum BrushOperator
+    {
+        Add,
+        Subtract
+    }
+
+    public class CsgBrush
+    {
+        public BrushGeometryKind GeometryKind { get; set; }
+
+        [ShowIf( nameof( GeometryKind ), BrushGeometryKind.Asset ), ResourceType( "csg" )]
+        public string AssetPath { get; set; }
+
+        public CsgAsset Asset => GeometryKind switch
+        {
+            BrushGeometryKind.Cube => CsgAsset.Cube,
+            BrushGeometryKind.Asset => string.IsNullOrEmpty( AssetPath )
+                ? CsgAsset.Empty
+                : ResourceLibrary.Get<CsgAsset>( AssetPath ),
+            _ => throw new NotImplementedException()
+        };
+
+        public BrushOperator Operator { get; set; }
+
+        public Vector3 Position { get; set; }
+        public Rotation Rotation { get; set; } = Rotation.Identity;
+        public Vector3 Scale { get; set; } = new Vector3( 1f, 1f, 1f );
+    }
+
+    [GameResource("CSG Asset", "csg", "A simple mesh that can be used to modify a CsgSolid.", Icon = "brush")]
+    public partial class CsgAsset : GameResource
+    {
+        public static CsgAsset Empty { get; } = new();
+
+        public static CsgAsset Cube { get; } = new ()
+        {
+            CompiledSolids = new List<ConvexSolid>
+            {
+                new ()
+                {
+                    Planes = new List<Plane>
+                    {
+                        new ()
+                        {
+                            Normal = new Vector3( 1f, 0f, 0f ),
+                            Distance = -64f
+                        },
+                        new ()
+                        {
+                            Normal = new Vector3( -1f, 0f, 0f ),
+                            Distance = -64f
+                        },
+                        new ()
+                        {
+                            Normal = new Vector3( 0f, 1f, 0f ),
+                            Distance = -64f
+                        },
+                        new ()
+                        {
+                            Normal = new Vector3( 0f, -1f, 0f ),
+                            Distance = -64f
+                        },
+                        new ()
+                        {
+                            Normal = new Vector3( 0f, 0f, 1f ),
+                            Distance = -64f
+                        },
+                        new ()
+                        {
+                            Normal = new Vector3( 0f, 0f, -1f ),
+                            Distance = -64f
+                        }
+                    }
+                }
+            }
+        };
+
+        private static CsgMaterial _defaultMaterial;
+
+        public static CsgMaterial DefaultMaterial => _defaultMaterial ??= ResourceLibrary.Get<CsgMaterial>( "materials/csgeditor/default.csgmat" );
 
         public struct ConvexSolid
         {
@@ -34,25 +116,39 @@ namespace Sandbox.Csg
             public float Distance { get; set; }
         }
 
-        public List<ConvexSolid> ConvexSolids { get; set; }
+        [HideInEditor]
+        public List<ConvexSolid> CompiledSolids { get; set; }
+
+        [HideInEditor]
+        public List<CsgBrush> Brushes { get; set; }
 
         [HideInEditor]
         public Model Model
         {
             get
             {
-                UpdateModel();
-
+                UpdateModel( ref _model, false );
                 return _model;
+            }
+        }
+
+        [HideInEditor]
+        public Model Wireframe
+        {
+            get
+            {
+                UpdateModel( ref _wireframe, true );
+                return _wireframe;
             }
         }
 
         private List<CsgHull> _hulls;
         private Model _model;
+        private Model _wireframe;
 
         public int CreateHulls( List<CsgHull> outHulls )
         {
-            UpdateSolids();
+            UpdateHulls();
 
             foreach ( var hull in _hulls )
             {
@@ -62,15 +158,15 @@ namespace Sandbox.Csg
             return _hulls.Count;
         }
 
-        private void UpdateSolids()
+        private void UpdateHulls()
         {
             if ( _hulls != null ) return;
 
             _hulls = new List<CsgHull>();
 
-            if ( ConvexSolids == null ) return;
+            if ( CompiledSolids == null ) return;
 
-            foreach ( var solidInfo in ConvexSolids )
+            foreach ( var solidInfo in CompiledSolids )
             {
                 var hull = new CsgHull { Material = solidInfo.Material ?? DefaultMaterial };
 
@@ -97,24 +193,25 @@ namespace Sandbox.Csg
             }
         }
 
-        private void UpdateModel()
+        private void UpdateModel( ref Model model, bool wireframe )
         {
-            if ( _model != null ) return;
+            if ( model != null ) return;
 
-            UpdateSolids();
+            UpdateHulls();
 
             var meshes = new Dictionary<int, Mesh>();
 
-            Assert.True( CsgSolid.UpdateMeshes( meshes, _hulls ) );
-
             var modelBuilder = new ModelBuilder();
 
-            foreach ( var (_, mesh) in meshes )
+            if ( CsgSceneObject.UpdateMeshes( meshes, _hulls, wireframe ) )
             {
-                modelBuilder.AddMesh( mesh );
+                foreach ( var (_, mesh) in meshes )
+                {
+                    modelBuilder.AddMesh( mesh );
+                }
             }
 
-            _model = modelBuilder.Create();
+            model = modelBuilder.Create();
         }
 
         protected override void PostLoad()
@@ -123,6 +220,7 @@ namespace Sandbox.Csg
 
             _hulls = null;
             _model = null;
+            _wireframe = null;
         }
 
         protected override void PostReload()
@@ -131,6 +229,7 @@ namespace Sandbox.Csg
 
             _hulls = null;
             _model = null;
+            _wireframe = null;
         }
 
 #if !SANDBOX_EDITOR

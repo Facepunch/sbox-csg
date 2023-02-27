@@ -17,7 +17,7 @@ namespace Sandbox.Csg
         public CsgMaterial Material { get; set; }
 
         internal (int X, int Y, int Z) GridCoord { get; set; }
-        internal CsgSolid.GridCell GridCell { get; set; }
+        internal CsgSceneObject.GridCell GridCell { get; set; }
 
         public bool IsEmpty { get; private set; }
         public bool IsFinite => !float.IsPositiveInfinity( Volume );

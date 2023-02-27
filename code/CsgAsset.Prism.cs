@@ -7,9 +7,9 @@ using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
-    partial class CsgBrush
+    partial class CsgAsset
     {
-        public static CsgBrush CreatePrism( IList<Vector3> baseVertices, Vector3 extrude )
+        public static CsgAsset CreatePrism( IList<Vector3> baseVertices, Vector3 extrude )
         {
             Assert.True( baseVertices.Count >= 3 );
 
@@ -36,21 +36,21 @@ namespace Sandbox.Csg
 
             CsgHelpers.MakeConvex( polygonVertices, polygonVertCounts );
 
-            var brush = new CsgBrush
+            var asset = new CsgAsset
             {
-                ConvexSolids = new List<ConvexSolid>()
+                CompiledSolids = new List<ConvexSolid>()
             };
 
             var offset = 0;
 
             foreach ( var count in polygonVertCounts )
             {
-                var solid = new CsgBrush.ConvexSolid
+                var solid = new CsgAsset.ConvexSolid
                 {
                     Planes = new List<Plane>( count + 2 )
                 };
 
-                brush.ConvexSolids.Add( solid );
+                asset.CompiledSolids.Add( solid );
 
                 solid.Planes.Add( basePlane );
                 solid.Planes.Add( extrudePlane );
@@ -71,7 +71,7 @@ namespace Sandbox.Csg
                 offset += count;
             }
 
-            return brush;
+            return asset;
         }
     }
 }

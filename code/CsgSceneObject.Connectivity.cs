@@ -103,7 +103,7 @@ namespace Sandbox.Csg
         }
     }
 
-    partial class CsgSolid
+    partial class CsgSceneObject
     {
         private bool UpdateIslands()
         {

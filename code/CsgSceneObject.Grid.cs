@@ -4,7 +4,7 @@ using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
-    partial class CsgSolid
+    partial class CsgSceneObject
     {
         public Vector3 GridSize { get; set; }
 
@@ -28,9 +28,9 @@ namespace Sandbox.Csg
 
             public SceneObject SceneObject { get; set; }
 
-            private CsgSolid _solid;
+            private CsgSceneObject _solid;
 
-            public CsgSolid Solid
+            public CsgSceneObject Solid
             {
                 get => _solid;
                 set
@@ -52,7 +52,7 @@ namespace Sandbox.Csg
             public bool MeshInvalid { get; private set; }
             public bool ConnectivityInvalid { get; private set; }
 
-            public GridCell( CsgSolid solid, (int X, int Y, int Z) coord )
+            public GridCell( CsgSceneObject solid, (int X, int Y, int Z) coord )
             {
                 Coord = coord;
                 Solid = solid;

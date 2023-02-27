@@ -13,7 +13,7 @@ namespace Sandbox.Csg
             return subFace.Neighbor == null && (subFace.Material ?? Material) != (material ?? Material);
         }
 
-        public bool Paint( CsgHull brush, CsgMaterial material )
+        public bool Paint( CsgHull hull, CsgMaterial material )
         {
             var paintCuts = CsgHelpers.RentFaceCutList();
             var negCuts = CsgHelpers.RentFaceCutList();
@@ -47,13 +47,13 @@ namespace Sandbox.Csg
                     paintCuts.Clear();
                     paintCuts.AddRange( face.FaceCuts );
 
-                    foreach ( var brushFace in brush.Faces )
+                    foreach ( var brushFace in hull.Faces )
                     {
                         paintCuts.Split( helper.GetCut( brushFace.Plane ) );
                     }
                     
                     if ( paintCuts.IsDegenerate() ) continue;
-                    if ( brush.GetSign( helper.GetAveragePos( paintCuts ) ) < 0 ) continue;
+                    if ( hull.GetSign( helper.GetAveragePos( paintCuts ) ) < 0 ) continue;
 
                     var avgPos = paintCuts.GetAveragePos();
 
@@ -65,7 +65,7 @@ namespace Sandbox.Csg
 
                         if ( !ShouldPaintSubFace( subFace, material ) ) continue;
 
-                        foreach ( var brushFace in brush.Faces )
+                        foreach ( var brushFace in hull.Faces )
                         {
                             var cut = helper.GetCut( brushFace.Plane );
 
@@ -83,7 +83,7 @@ namespace Sandbox.Csg
                             } );
                         }
 
-                        if ( brush.GetSign( helper.GetAveragePos( subFace.FaceCuts ) ) < 0 )
+                        if ( hull.GetSign( helper.GetAveragePos( subFace.FaceCuts ) ) < 0 )
                         {
                             continue;
                         }

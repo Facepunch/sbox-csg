@@ -4,18 +4,12 @@ using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
-    public partial class CsgSolid : IDisposable
+    public partial class CsgSceneObject : SceneCustomObject, IDisposable
     {
-        public SceneWorld World { get; }
-
-        public SceneObject SceneObject { get; }
-
-        public CsgSolid( SceneWorld world, Vector3 gridSize )
+        public CsgSceneObject( SceneWorld world, Vector3 gridSize )
+            : base( world )
         {
-            World = world;
             GridSize = gridSize;
-
-            SceneObject = new SceneCustomObject( world );
 
             SetupContainers( GridSize );
         }

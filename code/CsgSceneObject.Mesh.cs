@@ -9,7 +9,7 @@ namespace Sandbox.Csg
 {
     public record struct SubFaceIndices( int PolyIndex, int FaceIndex, int SubFaceIndex, int MaterialIndex );
 
-    partial class CsgSolid
+    partial class CsgSceneObject
     {
         private static Stopwatch Timer { get; } = new Stopwatch();
 
@@ -32,7 +32,7 @@ namespace Sandbox.Csg
                     continue;
                 }
 
-                if ( UpdateMeshes( cell.Meshes, cell.Hulls ) || !cell.SceneObject.IsValid() && cell.Meshes.Count > 0 )
+                if ( UpdateMeshes( cell.Meshes, cell.Hulls, false ) || !cell.SceneObject.IsValid() && cell.Meshes.Count > 0 )
                 {
                     var modelBuilder = new ModelBuilder();
                     
@@ -46,7 +46,7 @@ namespace Sandbox.Csg
                     cell.SceneObject?.Delete();
                     cell.SceneObject = new SceneObject( World, model );
 
-                    SceneObject.AddChild( $"Cell {cell.Coord}", cell.SceneObject );
+                    AddChild( $"Cell {cell.Coord}", cell.SceneObject );
                 }
 
                 cell.PostMeshUpdate();
@@ -66,7 +66,7 @@ namespace Sandbox.Csg
         [ThreadStatic]
         private static List<int> _sIndices;
 
-        internal static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra )
+        internal static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra, bool wireframe )
             where T : IList<CsgHull>
         {
             _sSubFaces ??= new List<SubFaceIndices>();
@@ -118,11 +118,12 @@ namespace Sandbox.Csg
                     if ( !meshes.TryGetValue( nextIndices.MaterialIndex, out mesh ) || !mesh.IsValid )
                     {
                         newMeshes = true;
-                        meshes[nextIndices.MaterialIndex] = mesh = new Mesh( material.RuntimeMaterial );
+                        meshes[nextIndices.MaterialIndex] = mesh = new Mesh( material.RuntimeMaterial,
+                            wireframe ? MeshPrimitiveType.Lines : MeshPrimitiveType.Triangles );
                     }
                 }
 
-                poly.WriteMeshSubFaces( _sSubFaces, ref offset, material, _sVertices, _sIndices );
+                poly.WriteMeshSubFaces( _sSubFaces, ref offset, material, _sVertices, _sIndices, wireframe );
 
                 var bounds = poly.VertexBounds;
 
@@ -193,7 +194,7 @@ namespace Sandbox.Csg
         }
 
         public void WriteMeshSubFaces( List<SubFaceIndices> subFaces, ref int offset,
-            CsgMaterial material, List<CsgVertex> vertices, List<int> indices )
+            CsgMaterial material, List<CsgVertex> vertices, List<int> indices, bool wireframe )
         {
             const float uvScale = 1f / 128f;
 
@@ -240,11 +241,25 @@ namespace Sandbox.Csg
                             0f ) ) );
                 }
 
-                for ( var i = 2; i < subFace.FaceCuts.Count; ++i )
+                if ( wireframe )
                 {
+                    indices.Add( firstIndex + subFace.FaceCuts.Count - 1 );
                     indices.Add( firstIndex );
-                    indices.Add( firstIndex + i - 1 );
-                    indices.Add( firstIndex + i );
+
+                    for ( var i = 1; i < subFace.FaceCuts.Count; ++i )
+                    {
+                        indices.Add( firstIndex + i - 1 );
+                        indices.Add( firstIndex + i );
+                    }
+                }
+                else
+                {
+                    for ( var i = 2; i < subFace.FaceCuts.Count; ++i )
+                    {
+                        indices.Add( firstIndex );
+                        indices.Add( firstIndex + i - 1 );
+                        indices.Add( firstIndex + i );
+                    }
                 }
             }
         }
