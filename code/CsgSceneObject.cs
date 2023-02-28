@@ -16,17 +16,7 @@ namespace Sandbox.Csg
 
         public void Dispose()
         {
-            DeleteSceneObjects();
-            Clear( true );
-        }
-
-        private void DeleteSceneObjects()
-        {
-            foreach ( var (_, cell) in _grid )
-            {
-                cell.SceneObject?.Delete();
-                cell.SceneObject = null;
-            }
+            Clear();
         }
 
         public BBox CalculateBounds()
@@ -50,20 +40,20 @@ namespace Sandbox.Csg
                 : new BBox( mins, maxs );
         }
 
-        internal void Clear( bool removeColliders )
+        internal void Clear()
         {
-            if ( removeColliders )
+            foreach ( var (_, cell) in _grid )
             {
-                foreach ( var pair in _grid )
-                {
-                    foreach ( var hull in pair.Value.Hulls )
-                    {
-                        hull.RemoveCollider();
+                cell.SceneObject?.Delete();
+                cell.SceneObject = null;
 
-                        hull.Island = null;
-                        hull.GridCell = null;
-                        hull.GridCoord = default;
-                    }
+                foreach ( var hull in cell.Hulls )
+                {
+                    hull.RemoveCollider();
+
+                    hull.Island = null;
+                    hull.GridCell = null;
+                    hull.GridCoord = default;
                 }
             }
 
