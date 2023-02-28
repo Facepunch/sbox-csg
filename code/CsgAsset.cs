@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Sandbox.Diagnostics;
 
@@ -32,7 +33,7 @@ namespace Sandbox.Csg
         [ShowIf( nameof( GeometryKind ), BrushGeometryKind.Asset ), ResourceType( "csg" )]
         public string AssetPath { get; set; }
 
-        [HideInEditor]
+        [HideInEditor, JsonIgnore]
         public CsgAsset Asset => GeometryKind switch
         {
             BrushGeometryKind.Cube => CsgAsset.Cube,
@@ -104,10 +105,6 @@ namespace Sandbox.Csg
         public struct ConvexSolid
         {
             public CsgMaterial Material { get; set; }
-
-            public int PlaneCount => Planes?.Count ?? 0;
-
-            [HideInEditor]
             public List<Plane> Planes { get; set; }
         }
 
@@ -129,7 +126,7 @@ namespace Sandbox.Csg
         [HideInEditor]
         public List<CsgBrush> Brushes { get; set; }
 
-        [HideInEditor]
+        [HideInEditor, JsonIgnore]
         public Model Model
         {
             get
@@ -139,7 +136,7 @@ namespace Sandbox.Csg
             }
         }
 
-        [HideInEditor]
+        [HideInEditor, JsonIgnore]
         public Model Wireframe
         {
             get
