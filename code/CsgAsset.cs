@@ -9,13 +9,19 @@ namespace Sandbox.Csg
 {
     public enum BrushGeometryKind
     {
+        [Icon("view_in_ar")]
         Cube,
+
+        [Icon("extension")]
         Asset
     }
 
     public enum BrushOperator
     {
+        [Icon("add")]
         Add,
+
+        [Icon("remove")]
         Subtract
     }
 
@@ -26,6 +32,7 @@ namespace Sandbox.Csg
         [ShowIf( nameof( GeometryKind ), BrushGeometryKind.Asset ), ResourceType( "csg" )]
         public string AssetPath { get; set; }
 
+        [HideInEditor]
         public CsgAsset Asset => GeometryKind switch
         {
             BrushGeometryKind.Cube => CsgAsset.Cube,
