@@ -65,6 +65,9 @@ namespace Sandbox.Csg
 
         [ThreadStatic]
         private static List<int> _sIndices;
+        
+        public static Material FrontWireframeMaterial { get; } = Material.Load( "materials/csgeditor/wireframe_front.vmat" );
+        public static Material BackWireframeMaterial { get; } = Material.Load( "materials/csgeditor/wireframe_back.vmat" );
 
         internal static bool UpdateMeshes<T>( Dictionary<int, Mesh> meshes, T polyhedra, bool wireframe )
             where T : IList<CsgHull>
@@ -78,6 +81,14 @@ namespace Sandbox.Csg
             for ( var i = 0; i < polyhedra.Count; ++i )
             {
                 polyhedra[i].FindSubFaces( i, _sSubFaces );
+            }
+
+            if ( wireframe )
+            {
+                for ( var i = 0; i < _sSubFaces.Count; ++i )
+                {
+                    _sSubFaces[i] = _sSubFaces[i] with { MaterialIndex = 0 };
+                }
             }
 
             _sSubFaces.Sort( ( a, b ) => a.MaterialIndex - b.MaterialIndex );
@@ -105,7 +116,7 @@ namespace Sandbox.Csg
                 if ( nextIndices.MaterialIndex != lastMaterialIndex )
                 {
                     lastMaterialIndex = nextIndices.MaterialIndex;
-                    material = ResourceLibrary.Get<CsgMaterial>( nextIndices.MaterialIndex );
+                    material = wireframe ? null : ResourceLibrary.Get<CsgMaterial>( nextIndices.MaterialIndex );
 
                     UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
 
@@ -118,7 +129,7 @@ namespace Sandbox.Csg
                     if ( !meshes.TryGetValue( nextIndices.MaterialIndex, out mesh ) || !mesh.IsValid )
                     {
                         newMeshes = true;
-                        meshes[nextIndices.MaterialIndex] = mesh = new Mesh( material.RuntimeMaterial,
+                        meshes[nextIndices.MaterialIndex] = mesh = new Mesh( wireframe ? BackWireframeMaterial.CreateCopy() : material.RuntimeMaterial,
                             wireframe ? MeshPrimitiveType.Lines : MeshPrimitiveType.Triangles );
                     }
                 }
@@ -132,6 +143,17 @@ namespace Sandbox.Csg
             }
 
             UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
+
+            if ( wireframe )
+            {
+                if ( !meshes.TryGetValue( 1, out mesh ) || !mesh.IsValid )
+                {
+                    newMeshes = true;
+                    meshes[1] = mesh = new Mesh( FrontWireframeMaterial.CreateCopy(), MeshPrimitiveType.Lines );
+                }
+
+                UpdateMesh( mesh, mins, maxs, _sVertices, _sIndices );
+            }
 
             return newMeshes;
         }
@@ -175,7 +197,7 @@ namespace Sandbox.Csg
     {
         public void FindSubFaces( int polyIndex, List<SubFaceIndices> subFaces )
         {
-            var materialId = Material.ResourceId;
+            var materialId = Material?.ResourceId ?? 0;
 
             for ( var faceIndex = 0; faceIndex < _faces.Count; ++faceIndex )
             {
