@@ -179,7 +179,7 @@ namespace Sandbox.Csg
                 : default;
         }
 
-        private int GetAllHulls( List<CsgHull> outHulls )
+        public int GetAllHulls( List<CsgHull> outHulls )
         {
             var count = 0;
 
