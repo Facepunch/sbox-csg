@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -28,13 +29,16 @@ namespace Sandbox.Csg
 
     public class CsgBrush
     {
+        [HideInEditor]
         public BrushGeometryKind GeometryKind { get; set; }
 
         [ShowIf( nameof( GeometryKind ), BrushGeometryKind.Asset ), ResourceType( "csg" )]
         public string AssetPath { get; set; }
 
+        private CsgAsset _asset;
+
         [HideInEditor, JsonIgnore]
-        public CsgAsset Asset => GeometryKind switch
+        public CsgAsset Asset => _asset ??= GeometryKind switch
         {
             BrushGeometryKind.Cube => CsgAsset.Cube,
             BrushGeometryKind.Asset => string.IsNullOrEmpty( AssetPath )
@@ -47,7 +51,39 @@ namespace Sandbox.Csg
 
         public Vector3 Position { get; set; }
         public Rotation Rotation { get; set; } = Rotation.Identity;
+
+        [HideInEditor]
         public Vector3 Scale { get; set; } = new Vector3( 1f, 1f, 1f );
+
+        [JsonIgnore]
+        public Vector3 Size
+        {
+            get => Scale * Asset.CompiledBounds.Size;
+            set
+            {
+                var assetSize = Asset.CompiledBounds.Size;
+
+                if ( assetSize.x <= CsgHelpers.DistanceEpsilon ) assetSize.x = 1f;
+                if ( assetSize.y <= CsgHelpers.DistanceEpsilon ) assetSize.y = 1f;
+                if ( assetSize.z <= CsgHelpers.DistanceEpsilon ) assetSize.y = 1f;
+
+                Scale = value * new Vector3( 1f / assetSize.x, 1f / assetSize.y, 1f / assetSize.z );
+            }
+        }
+
+        public CsgBrush Copy()
+        {
+            return new CsgBrush
+            {
+                GeometryKind = GeometryKind,
+                AssetPath = AssetPath,
+                Operator = Operator,
+
+                Position = Position,
+                Rotation = Rotation,
+                Scale = Scale
+            };
+        }
     }
 
     [GameResource("CSG Asset", "csg", "A simple mesh that can be used to modify a CsgSolid.", Icon = "brush")]
@@ -95,7 +131,8 @@ namespace Sandbox.Csg
                         }
                     }
                 }
-            }
+            },
+            CompiledBounds = new BBox( new Vector3( 0f, 0f, 0f ), 128f )
         };
 
         private static CsgMaterial _defaultMaterial;
@@ -122,6 +159,9 @@ namespace Sandbox.Csg
 
         [HideInEditor]
         public List<ConvexSolid> CompiledSolids { get; set; }
+
+        [HideInEditor]
+        public BBox CompiledBounds { get; set; }
 
         [HideInEditor]
         public List<CsgBrush> Brushes { get; set; }
