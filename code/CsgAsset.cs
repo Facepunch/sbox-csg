@@ -50,7 +50,7 @@ namespace Sandbox.Csg
         public BrushOperator Operator { get; set; }
 
         public Vector3 Position { get; set; }
-        public Rotation Rotation { get; set; } = Rotation.Identity;
+        public Angles Angles { get; set; }
 
         [HideInEditor]
         public Vector3 Scale { get; set; } = new Vector3( 1f, 1f, 1f );
@@ -80,7 +80,7 @@ namespace Sandbox.Csg
                 Operator = Operator,
 
                 Position = Position,
-                Rotation = Rotation,
+                Angles = Angles,
                 Scale = Scale
             };
         }
