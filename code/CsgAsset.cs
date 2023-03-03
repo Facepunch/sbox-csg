@@ -157,14 +157,22 @@ namespace Sandbox.Csg
             public float Distance { get; set; }
         }
 
+        private static Angles DefaultEditorCameraAngles { get; } = new Angles( 30f, 240f, 0f );
+
+        [HideInEditor]
+        public List<CsgBrush> Brushes { get; set; }
+
+        [HideInEditor]
+        public Vector3 EditorCameraPos { get; set; } = -Rotation.From( DefaultEditorCameraAngles ).Forward * 256f;
+
+        [HideInEditor]
+        public Angles EditorCameraAngles { get; set; } = DefaultEditorCameraAngles;
+
         [HideInEditor]
         public List<ConvexSolid> CompiledSolids { get; set; }
 
         [HideInEditor]
         public BBox CompiledBounds { get; set; }
-
-        [HideInEditor]
-        public List<CsgBrush> Brushes { get; set; }
 
         [HideInEditor, JsonIgnore]
         public Model Model
