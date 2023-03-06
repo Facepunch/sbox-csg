@@ -174,6 +174,9 @@ namespace Sandbox.Csg
         [HideInEditor]
         public BBox CompiledBounds { get; set; }
 
+        [HideInEditor]
+        public int EditCount { get; set; }
+
         [HideInEditor, JsonIgnore]
         public Model Model
         {
