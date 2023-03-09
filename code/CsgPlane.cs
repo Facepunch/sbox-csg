@@ -68,6 +68,28 @@ namespace Sandbox.Csg
                 Math.Abs(1f - Vector3.Dot(Normal, other.Normal)) < CsgHelpers.UnitEpsilon &&
                 Math.Abs(Distance - other.Distance) <= CsgHelpers.DistanceEpsilon;
         }
+
+        public bool TryTrace( Ray ray, out float dist, float maxDist = float.PositiveInfinity )
+        {
+            var n = Normal;
+            var denominator = ray.Forward.Dot( n );
+
+            dist = float.PositiveInfinity;
+
+            if ( denominator >= -CsgHelpers.UnitEpsilon )
+                return false;
+
+            var offset = ray.Position.Dot( n ) - Distance;
+
+            if ( offset < -CsgHelpers.DistanceEpsilon )
+            {
+                return false;
+            }
+
+            dist = -offset / denominator;
+
+            return dist < maxDist;
+        }
         
         public override bool Equals( object obj )
         {
