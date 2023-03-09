@@ -71,6 +71,8 @@ namespace Sandbox.Csg
                 offset += count;
             }
 
+            throw new NotImplementedException( "TODO: bounds for each hull" );
+
             return asset;
         }
     }

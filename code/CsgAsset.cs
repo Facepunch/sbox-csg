@@ -129,7 +129,8 @@ namespace Sandbox.Csg
                             Normal = new Vector3( 0f, 0f, -1f ),
                             Distance = -64f
                         }
-                    }
+                    },
+                    Bounds = new BBox( new Vector3( 0f, 0f, 0f ), 128f )
                 }
             },
             CompiledBounds = new BBox( new Vector3( 0f, 0f, 0f ), 128f )
@@ -143,6 +144,7 @@ namespace Sandbox.Csg
         {
             public CsgMaterial Material { get; set; }
             public List<Plane> Planes { get; set; }
+            public BBox Bounds { get; set; }
         }
 
         public struct Plane
