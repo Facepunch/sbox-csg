@@ -130,10 +130,12 @@ namespace Sandbox.Csg
                             Distance = -64f
                         }
                     },
-                    Bounds = new BBox( new Vector3( 0f, 0f, 0f ), 128f )
+                    Mins = -64f,
+                    Maxs = 64f
                 }
             },
-            CompiledBounds = new BBox( new Vector3( 0f, 0f, 0f ), 128f )
+            CompiledMins = -64f,
+            CompiledMaxs = 64f
         };
 
         private static CsgMaterial _defaultMaterial;
@@ -144,7 +146,11 @@ namespace Sandbox.Csg
         {
             public CsgMaterial Material { get; set; }
             public List<Plane> Planes { get; set; }
-            public BBox Bounds { get; set; }
+            public Vector3 Mins { get; set; }
+            public Vector3 Maxs { get; set; }
+
+            [JsonIgnore]
+            public BBox Bounds => new BBox( Mins, Maxs );
         }
 
         public struct Plane
@@ -174,7 +180,12 @@ namespace Sandbox.Csg
         public List<ConvexSolid> CompiledSolids { get; set; }
 
         [HideInEditor]
-        public BBox CompiledBounds { get; set; }
+        public Vector3 CompiledMins { get; set; }
+        [HideInEditor]
+        public Vector3 CompiledMaxs { get; set; }
+
+        [JsonIgnore]
+        public BBox CompiledBounds => new BBox( CompiledMins, CompiledMaxs );
 
         [HideInEditor]
         public int EditCount { get; set; }
