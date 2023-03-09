@@ -176,6 +176,15 @@ namespace Sandbox.Csg
             return true;
         }
 
+        public static bool Contains( this BBox box, Vector3 pos, float epsilon = DistanceEpsilon )
+        {
+            var min = box.Mins - pos;
+            var max = pos - box.Maxs;
+
+            return min.x <= DistanceEpsilon && min.y <= DistanceEpsilon && min.z <= DistanceEpsilon
+                && max.x <= DistanceEpsilon && max.y <= DistanceEpsilon && max.z <= DistanceEpsilon;
+        }
+
         public static bool Contains( this List<CsgHull.FaceCut> faceCuts, Vector2 pos )
         {
             foreach ( var faceCut in faceCuts )
