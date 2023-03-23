@@ -1,19 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Sandbox.Diagnostics;
 
 namespace Sandbox.Csg
 {
     partial class CsgAsset
     {
-        public static CsgAsset CreatePrism( IList<Vector3> baseVertices, Vector3 extrude )
+        public void UpdatePrism( IList<Vector2> baseVertices, Vector3 extrude )
         {
             Assert.True( baseVertices.Count >= 3 );
 
-            var baseNormal = Vector3.Cross( baseVertices[1] - baseVertices[0], baseVertices[2] - baseVertices[1] ).Normal;
+            var baseNormal = new Vector3( 0f, 0f, 1f );
 
             if ( Vector3.Dot( extrude, baseNormal ) < 0f )
             {
@@ -21,59 +19,59 @@ namespace Sandbox.Csg
             }
 
             var basePlane = new CsgPlane( baseNormal, baseVertices[0] );
-            var extrudePlane = new CsgPlane( -baseNormal, baseVertices[0] + extrude );
+            var extrudePlane = new CsgPlane( -baseNormal, (Vector3) baseVertices[0] + extrude );
 
-            var basePlaneHelper = basePlane.GetHelper();
-
-            var polygonVertices = new List<Vector2>();
-
-            foreach ( var baseVertex in baseVertices )
-            {
-                polygonVertices.Add( basePlaneHelper.Project( baseVertex ) );
-            }
-
+            var polygonVertices = baseVertices.ToList();
             var polygonVertCounts = new List<int>();
 
             CsgHelpers.MakeConvex( polygonVertices, polygonVertCounts );
 
-            var asset = new CsgAsset
-            {
-                CompiledSolids = new List<ConvexSolid>()
-            };
-
             var offset = 0;
+
+            CompiledSolids ??= new List<ConvexSolid>();
+            CompiledSolids.Clear();
+
+            CompiledMins = new Vector3( float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity );
+            CompiledMaxs = new Vector3( float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity );
 
             foreach ( var count in polygonVertCounts )
             {
-                var solid = new CsgAsset.ConvexSolid
+                var solid = new ConvexSolid
                 {
-                    Planes = new List<Plane>( count + 2 )
+                    Planes = new List<Plane>( count + 2 ),
+                    Mins = new Vector3( float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity ),
+                    Maxs = new Vector3( float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity )
                 };
-
-                asset.CompiledSolids.Add( solid );
 
                 solid.Planes.Add( basePlane );
                 solid.Planes.Add( extrudePlane );
 
-                var prev = basePlaneHelper.GetPoint( polygonVertices[offset + count - 1] );
+                var prev = (Vector3) polygonVertices[offset + count - 1];
 
                 for ( var i = 0; i < count; i++ )
                 {
-                    var next = basePlaneHelper.GetPoint( polygonVertices[offset + i] );
+                    var next = (Vector3) polygonVertices[offset + i];
+                    var top = next + extrude;
 
-                    var faceNormal = Vector3.Cross( extrude, next - prev ).Normal;
+                    solid.Mins = Vector3.Min( solid.Mins, Vector3.Min( next, top ) );
+                    solid.Maxs = Vector3.Max( solid.Maxs, Vector3.Max( next, top ) );
+
+                    var faceNormal = Vector3.Cross( next - prev, extrude ).Normal;
 
                     solid.Planes.Add( new Plane { Normal = faceNormal, Distance = Vector3.Dot( faceNormal, next ) } );
 
                     prev = next;
                 }
 
+                CompiledSolids.Add( solid );
+
+                CompiledMins = Vector3.Min( CompiledMins, solid.Mins );
+                CompiledMaxs = Vector3.Max( CompiledMaxs, solid.Maxs );
+
                 offset += count;
             }
 
-            throw new NotImplementedException( "TODO: bounds for each hull" );
-
-            return asset;
+            InvalidateGeometry();
         }
     }
 }

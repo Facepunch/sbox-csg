@@ -15,7 +15,10 @@ namespace Sandbox.Csg
         Cube,
 
         [Icon("extension")]
-        Asset
+        Asset,
+
+        [Icon("pentagon")]
+        Prism
     }
 
     public enum BrushOperator
@@ -36,16 +39,21 @@ namespace Sandbox.Csg
         public string AssetPath { get; set; }
 
         private CsgAsset _asset;
+        private bool _assetInvalid = true;
 
         [HideInEditor, JsonIgnore]
-        public CsgAsset Asset => _asset ??= GeometryKind switch
+        public CsgAsset Asset
         {
-            BrushGeometryKind.Cube => CsgAsset.Cube,
-            BrushGeometryKind.Asset => string.IsNullOrEmpty( AssetPath )
-                ? CsgAsset.Empty
-                : ResourceLibrary.Get<CsgAsset>( AssetPath ),
-            _ => throw new NotImplementedException()
-        };
+            get
+            {
+                if ( _assetInvalid || _asset == null )
+                {
+                    UpdateAsset();
+                }
+
+                return _asset;
+            }
+        }
 
         public BrushOperator Operator { get; set; }
 
@@ -54,6 +62,18 @@ namespace Sandbox.Csg
 
         [HideInEditor]
         public Vector3 Scale { get; set; } = new Vector3( 1f, 1f, 1f );
+
+        /// <summary>
+        /// Only used by <see cref="BrushGeometryKind.Prism"/>
+        /// </summary>
+        [HideInEditor]
+        public List<Vector2> BaseVertices { get; set; }
+
+        /// <summary>
+        /// Only used by <see cref="BrushGeometryKind.Prism"/>
+        /// </summary>
+        [HideInEditor]
+        public Vector3 Extrusion { get; set; }
 
         [JsonIgnore]
         public Vector3 Size
@@ -71,6 +91,30 @@ namespace Sandbox.Csg
             }
         }
 
+        public void InvalidateAsset()
+        {
+            _assetInvalid = true;
+        }
+
+        public void UpdateAsset()
+        {
+            _assetInvalid = false;
+            _asset ??= GeometryKind switch
+            {
+                BrushGeometryKind.Cube => CsgAsset.Cube,
+                BrushGeometryKind.Asset => string.IsNullOrEmpty( AssetPath )
+                    ? CsgAsset.Empty
+                    : ResourceLibrary.Get<CsgAsset>( AssetPath ),
+                BrushGeometryKind.Prism => new CsgAsset(),
+                _ => throw new NotImplementedException()
+            };
+
+            if ( GeometryKind == BrushGeometryKind.Prism )
+            {
+                _asset.UpdatePrism( BaseVertices, Extrusion );
+            }
+        }
+
         public CsgBrush Copy()
         {
             return new CsgBrush
@@ -78,6 +122,9 @@ namespace Sandbox.Csg
                 GeometryKind = GeometryKind,
                 AssetPath = AssetPath,
                 Operator = Operator,
+
+                BaseVertices = GeometryKind == BrushGeometryKind.Prism ? BaseVertices.ToList() : null,
+                Extrusion = GeometryKind == BrushGeometryKind.Prism ? Extrusion : default,
 
                 Position = Position,
                 Angles = Angles,
@@ -195,7 +242,7 @@ namespace Sandbox.Csg
         {
             get
             {
-                UpdateModel( ref _model, false );
+                UpdateModel( ref _model, ref _modelInvalid, _modelMeshes, false );
                 return _model;
             }
         }
@@ -205,14 +252,28 @@ namespace Sandbox.Csg
         {
             get
             {
-                UpdateModel( ref _wireframe, true );
+                UpdateModel( ref _wireframe, ref _wireframeInvalid, _wireframeMeshes, true );
                 return _wireframe;
             }
         }
 
-        private List<CsgHull> _hulls;
+        private bool _hullsInvalid = true;
+        private bool _modelInvalid = true;
+        private bool _wireframeInvalid = true;
+
+        private readonly List<CsgHull> _hulls = new List<CsgHull>();
+        private readonly Dictionary<int, Mesh> _modelMeshes = new Dictionary<int, Mesh>();
+        private readonly Dictionary<int, Mesh> _wireframeMeshes = new Dictionary<int, Mesh>();
+
         private Model _model;
         private Model _wireframe;
+
+        public void InvalidateGeometry()
+        {
+            _hullsInvalid = true;
+            _modelInvalid = true;
+            _wireframeInvalid = true;
+        }
 
         public int CreateHulls( List<CsgHull> outHulls )
         {
@@ -228,9 +289,10 @@ namespace Sandbox.Csg
 
         private void UpdateHulls()
         {
-            if ( _hulls != null ) return;
+            if ( !_hullsInvalid ) return;
 
-            _hulls = new List<CsgHull>();
+            _hulls.Clear();
+            _hullsInvalid = false;
 
             if ( CompiledSolids == null ) return;
 
@@ -261,22 +323,21 @@ namespace Sandbox.Csg
             }
         }
 
-        private void UpdateModel( ref Model model, bool wireframe )
+        private void UpdateModel( ref Model model, ref bool invalid, Dictionary<int, Mesh> meshes, bool wireframe )
         {
-            if ( model != null ) return;
+            if ( model != null && !invalid ) return;
+
+            invalid = false;
 
             UpdateHulls();
 
-            var meshes = new Dictionary<int, Mesh>();
+            if ( !CsgSceneObject.UpdateMeshes( meshes, _hulls, wireframe ) && model != null ) return;
 
             var modelBuilder = new ModelBuilder();
 
-            if ( CsgSceneObject.UpdateMeshes( meshes, _hulls, wireframe ) )
+            foreach ( var (_, mesh) in meshes )
             {
-                foreach ( var (_, mesh) in meshes )
-                {
-                    modelBuilder.AddMesh( mesh );
-                }
+                modelBuilder.AddMesh( mesh );
             }
 
             model = modelBuilder.Create();
@@ -286,18 +347,14 @@ namespace Sandbox.Csg
         {
             base.PostLoad();
 
-            _hulls = null;
-            _model = null;
-            _wireframe = null;
+            InvalidateGeometry();
         }
 
         protected override void PostReload()
         {
             base.PostReload();
 
-            _hulls = null;
-            _model = null;
-            _wireframe = null;
+            InvalidateGeometry();
         }
 
 #if !SANDBOX_EDITOR
